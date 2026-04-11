@@ -1,0 +1,12 @@
+{
+  "instance_id": "4daaa233-nogit",
+  "branch": "HEAD",
+  "worktree_path": "/root/.hermes/prd/processing/prd:-paperclip-product-autopilot-plugin",
+  "repo_path": "/root/.hermes/prd/processing/prd:-paperclip-product-autopilot-plugin",
+  "prd_name": "PRD: Paperclip Product Autopilot Plugin",
+  "prd_file": "paperclip-product-autopilot-plugin.md",
+  "started_at": "2026-04-11T21:47:11.622179",
+  "status": "running",
+  "hermes_session": "",
+  "last_heartbeat": "2026-04-11T21:51:22.532855"
+}

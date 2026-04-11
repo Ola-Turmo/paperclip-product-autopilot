@@ -1,0 +1,33 @@
+{
+  "name": "@paperclipai/product-autopilot",
+  "version": "0.1.0",
+  "description": "Autensa-inspired product-improvement engine built as a Paperclip plugin",
+  "type": "module",
+  "main": "dist/worker/index.js",
+  "types": "dist/worker/index.d.ts",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:worker": "esbuild src/worker/index.ts --bundle --platform=node --outfile=dist/worker/index.js --format=esm --external:@paperclipai/* --external:node:*",
+    "build:ui": "esbuild src/ui/index.tsx --bundle --outfile=dist/ui/index.js --format=iife --jsx=automatic --loader:.tsx=jsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.3"
+  },
+  "paperclip": {
+    "plugin": {
+      "id": "product-autopilot",
+      "name": "Product Autopilot",
+      "version": "0.1.0"
+    }
+  }
+}
