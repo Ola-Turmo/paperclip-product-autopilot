@@ -17,6 +17,7 @@ import type {
   Idea,
   ResearchCycle,
 } from "../types.js";
+import { getIdeationBenchmarkSummary } from "../services/evaluation-fixtures.js";
 
 const PAGE: CSSProperties = { display: "grid", gap: 16, padding: 20 };
 const CARD: CSSProperties = {
@@ -368,6 +369,48 @@ function RunsCard(props: { companyId: string; projectId: string }) {
   );
 }
 
+function EvaluationCard() {
+  const summary = getIdeationBenchmarkSummary();
+
+  return (
+    <Section title="Evaluation Scorecard">
+      <div style={GRID}>
+        <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
+            {Math.round(summary.top1Accuracy * 100)}%
+          </div>
+          <div style={MUTED}>Top-1 Accuracy</div>
+        </div>
+        <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
+            {Math.round(summary.top3Accuracy * 100)}%
+          </div>
+          <div style={MUTED}>Top-3 Accuracy</div>
+        </div>
+        <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
+            {summary.meanReciprocalRank.toFixed(2)}
+          </div>
+          <div style={MUTED}>Mean Reciprocal Rank</div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+        {summary.results.map((result) => (
+          <div key={result.caseId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ fontWeight: 700, color: "#0f172a" }}>{result.caseId}</div>
+              <StatusPill status={result.top1Hit ? "completed" : "maybe"} />
+            </div>
+            <div style={{ ...MUTED, marginTop: 6 }}>
+              Ranked: {result.rankedFindingIds.slice(0, 3).join(" -> ")}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 export function AutopilotProjectTab({ context }: PluginDetailTabProps) {
   const companyId = context.companyId;
   const projectId = context.entityId;
@@ -394,6 +437,7 @@ export function AutopilotProjectTab({ context }: PluginDetailTabProps) {
       {overview ? <StatsRow overview={overview} /> : null}
       <ProjectSettingsCard companyId={companyId} projectId={projectId} project={project} onSaved={refreshAll} />
       <ResearchCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
+      <EvaluationCard />
       <IdeasCard companyId={companyId} projectId={projectId} />
       <RunsCard companyId={companyId} projectId={projectId} />
     </div>

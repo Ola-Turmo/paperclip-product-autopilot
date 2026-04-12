@@ -527,15 +527,15 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [ ] Add duration and latency metrics, not just counters.
 - [ ] Add structured failure categories.
 - [~] Build a replay harness for decision evaluation.
-- [ ] Add benchmark fixtures for ranking quality, safety behavior, and digest behavior.
-- [ ] Add a simple scorecard that can answer whether the system is getting better.
+- [~] Add benchmark fixtures for ranking quality, safety behavior, and digest behavior.
+- [~] Add a simple scorecard that can answer whether the system is getting better.
 
 ### 16.10 UI and operator experience
 
 - [x] Replace broken UI wiring with a working SDK-aligned UI.
 - [ ] Turn the UI from a stabilization surface into a true operator console.
 - [ ] Add a run audit timeline.
-- [ ] Add evidence drill-down for ideas and research findings.
+- [~] Add evidence drill-down for ideas and research findings.
 - [ ] Add clearer intervention workflows for pause, resume, checkpoint, rollback, and note-taking.
 - [ ] Add budget and digest management surfaces.
 - [ ] Add better empty states, loading states, and error states.
