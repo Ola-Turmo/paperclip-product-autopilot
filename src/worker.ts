@@ -101,6 +101,33 @@ import {
   upsertRollbackAction,
   applySwipeToPreferenceProfile,
 } from "./helpers.js";
+import { buildAutopilotOverview } from "./services/overview.js";
+import {
+  createBudgetAlertDigest as buildBudgetAlertDigest,
+  createStuckRunDigest as buildStuckRunDigest,
+  shouldPauseForBudget,
+} from "./services/policy.js";
+import {
+  buildPendingDeliveryRun,
+  buildPlanningArtifact,
+  buildProductLock,
+  buildWorkspaceLease,
+  getAutomationTier,
+  pauseDeliveryRun as buildPausedRun,
+  releaseProductLock as buildReleasedLock,
+  releaseWorkspaceLease as buildReleasedLease,
+  resumeDeliveryRun as buildResumedRun,
+  shouldCreateDeliveryRun,
+  shouldReleaseRunResources,
+  updateDeliveryRunStatus,
+} from "./services/delivery.js";
+import { shouldResurfaceIdea } from "./services/resurface.js";
+import {
+  applySwipeToIdea,
+  buildSwipeEvent,
+  createEmptyPreferenceProfile,
+  deriveIdeaStatusFromSwipe,
+} from "./services/swipe.js";
 
 // ─── Validation helpers ────────────────────────────────────────────────────────
 function isNonEmptyString(v: unknown): v is string {
@@ -180,29 +207,7 @@ export function registerDataHandlers(ctx: PluginContext) {
       listSwipeEvents(ctx, companyId, projectId, 50),
       getCompanyBudget(ctx, companyId),
     ]);
-    const today = new Date().toDateString();
-    const todaySwipes = swipes.filter((s) => new Date(s.createdAt).toDateString() === today);
-    const runningRuns = runs.filter((r) => r.status === "running");
-    const completedRuns = runs.filter((r) => r.status === "completed");
-    const failedRuns = runs.filter((r) => r.status === "failed");
-    const usagePct = budget && budget.autopilotBudgetMinutes > 0
-      ? Math.round((budget.autopilotUsedMinutes / budget.autopilotBudgetMinutes) * 100)
-      : 0;
-
-    const overview: AutopilotOverview = {
-      projectCount: 1,
-      enabledCount: project?.enabled ? 1 : 0,
-      pausedCount: project?.paused ? 1 : 0,
-      activeIdeasCount: ideas.filter((i) => i.status === "active").length,
-      maybePoolCount: maybeIdeas.length,
-      approvedIdeasCount: ideas.filter((i) => i.status === "approved").length,
-      runningRunsCount: runningRuns.length,
-      completedRunsCount: completedRuns.length,
-      failedRunsCount: failedRuns.length,
-      totalSwipesToday: todaySwipes.length,
-      budgetUsagePercent: usagePct,
-    };
-    return overview;
+    return buildAutopilotOverview({ project, ideas, maybeIdeas, runs, swipes, budget });
   });
 
   ctx.data.register(DATA_KEYS.productProgramRevision, async (args) => {
@@ -541,121 +546,7 @@ export function registerActionHandlers(ctx: PluginContext) {
     if (!isNonEmptyString(a.projectId)) throw new Error("projectId required");
     if (!isNonEmptyString(a.ideaId)) throw new Error("ideaId required");
     if (!isSwipeDecision(a.decision)) throw new Error("Invalid swipe decision");
-
-    const idea = await getIdea(ctx, a.companyId, a.projectId, a.ideaId);
-    if (!idea) throw new Error("Idea not found");
-
-    const swipe: SwipeEvent = {
-      swipeId: newId(),
-      companyId: a.companyId,
-      projectId: a.projectId,
-      ideaId: a.ideaId,
-      decision: a.decision,
-      note: a.note,
-      createdAt: nowIso(),
-    };
-    await upsertSwipeEvent(ctx, swipe);
-
-    let newStatus: IdeaStatus = idea.status;
-    if (a.decision === "pass") newStatus = "rejected";
-    else if (a.decision === "maybe") newStatus = "maybe";
-    else if (a.decision === "yes" || a.decision === "now") newStatus = "approved";
-
-    const updatedIdea: Idea = { ...idea, status: newStatus, updatedAt: nowIso() };
-    await upsertIdea(ctx, updatedIdea);
-
-    let profile = await getPreferenceProfile(ctx, a.companyId, a.projectId);
-    if (!profile) {
-      profile = {
-        profileId: newId(),
-        companyId: a.companyId,
-        projectId: a.projectId,
-        passCount: 0, maybeCount: 0, yesCount: 0, nowCount: 0,
-        totalSwipes: 0,
-        categoryPreferences: {},
-        tagPreferences: {},
-        avgApprovedScore: 0,
-        avgRejectedScore: 0,
-        lastUpdated: nowIso(),
-      };
-    }
-    const updatedProfile = applySwipeToPreferenceProfile(profile, a.decision, idea);
-    await upsertPreferenceProfile(ctx, updatedProfile);
-
-    const autopilot = await getAutopilotProject(ctx, a.companyId, a.projectId);
-    let planningArtifact: PlanningArtifact | undefined;
-    let deliveryRun: DeliveryRun | undefined;
-
-    if ((a.decision === "yes" || a.decision === "now") && autopilot?.enabled) {
-      const artifactId = newId();
-      planningArtifact = {
-        artifactId,
-        companyId: a.companyId,
-        projectId: a.projectId,
-        ideaId: a.ideaId,
-        title: `Plan: ${idea.title.slice(0, 60)}`,
-        goalAlignmentSummary: idea.rationale,
-        implementationSpec: idea.technicalApproach ?? "",
-        dependencies: [],
-        rolloutPlan: "",
-        testPlan: "",
-        approvalChecklist: [],
-        executionMode: "simple",
-        approvalMode: autopilot.automationTier === "fullauto" ? "auto_approve" : "manual",
-        automationTier: autopilot.automationTier,
-        status: "draft",
-        createdAt: nowIso(),
-        updatedAt: nowIso(),
-      };
-      await upsertPlanningArtifact(ctx, planningArtifact);
-
-      if (autopilot.automationTier !== "supervised" || a.decision === "now") {
-        const runId = newId();
-        const branchName = generateBranchName(a.projectId, a.ideaId);
-        deliveryRun = {
-          runId,
-          companyId: a.companyId,
-          projectId: a.projectId,
-          ideaId: a.ideaId,
-          artifactId,
-          title: `Delivery: ${idea.title.slice(0, 60)}`,
-          status: "pending",
-          automationTier: autopilot.automationTier,
-          branchName,
-          workspacePath: autopilot.workspaceId ?? "",
-          leasedPort: null,
-          commitSha: null,
-          paused: false,
-          completedAt: null,
-          createdAt: nowIso(),
-          updatedAt: nowIso(),
-        };
-        await upsertDeliveryRun(ctx, deliveryRun);
-
-        const lock: ProductLock = {
-          lockId: newId(),
-          companyId: a.companyId,
-          projectId: a.projectId,
-          runId,
-          lockType: "product_lock",
-          targetBranch: branchName,
-          targetPath: "",
-          acquiredAt: nowIso(),
-          releasedAt: null,
-          isActive: true,
-        };
-        await upsertProductLock(ctx, lock);
-      }
-    }
-
-    await ctx.activity.log({
-      companyId: a.companyId,
-      message: `Swipe ${a.decision} on idea: ${idea.title.slice(0, 60)}`,
-      entityType: "swipe-event",
-      entityId: swipe.swipeId,
-    });
-
-    return { swipe, idea: updatedIdea, profile: updatedProfile, planningArtifact, deliveryRun };
+    return await processSwipeDecision(ctx, a);
   });
 
   ctx.actions.register(ACTION_KEYS.createPlanningArtifact, async (args) => {
@@ -663,25 +554,23 @@ export function registerActionHandlers(ctx: PluginContext) {
     const idea = await getIdea(ctx, a.companyId, a.projectId, a.ideaId);
     if (!idea) throw new Error("Idea not found");
     const autopilot = await getAutopilotProject(ctx, a.companyId, a.projectId);
-    const artifact: PlanningArtifact = {
+    const artifact = buildPlanningArtifact({
       artifactId: newId(),
       companyId: a.companyId,
       projectId: a.projectId,
       ideaId: a.ideaId,
-      title: a.title ?? `Plan: ${idea.title.slice(0, 60)}`,
-      goalAlignmentSummary: a.goalAlignmentSummary ?? idea.rationale,
-      implementationSpec: a.implementationSpec ?? idea.technicalApproach ?? "",
-      dependencies: a.dependencies ?? [],
-      rolloutPlan: a.rolloutPlan ?? "",
-      testPlan: a.testPlan ?? "",
-      approvalChecklist: a.approvalChecklist ?? [],
-      executionMode: "simple",
-      approvalMode: a.approvalMode ?? (autopilot?.automationTier === "fullauto" ? "auto_approve" : "manual"),
-      automationTier: autopilot?.automationTier ?? "supervised",
-      status: "draft",
+      idea,
+      automationTier: getAutomationTier(autopilot),
       createdAt: nowIso(),
-      updatedAt: nowIso(),
-    };
+      title: a.title,
+      goalAlignmentSummary: a.goalAlignmentSummary,
+      implementationSpec: a.implementationSpec,
+      dependencies: a.dependencies,
+      rolloutPlan: a.rolloutPlan,
+      testPlan: a.testPlan,
+      approvalChecklist: a.approvalChecklist,
+      approvalMode: a.approvalMode,
+    });
     await upsertPlanningArtifact(ctx, artifact);
     return artifact;
   });
@@ -695,30 +584,25 @@ export function registerActionHandlers(ctx: PluginContext) {
     const runId = newId();
     const branchName = generateBranchName(a.projectId, a.ideaId);
     const port = allocatePort();
+    const createdAt = nowIso();
 
-    const run: DeliveryRun = {
+    const run = buildPendingDeliveryRun({
       runId,
       companyId: a.companyId,
       projectId: a.projectId,
       ideaId: a.ideaId,
       artifactId: a.artifactId ?? "",
-      title: a.title ?? `Delivery: ${idea.title.slice(0, 60)}`,
-      status: "pending",
-      automationTier: a.automationTier ?? autopilot?.automationTier ?? "supervised",
+      idea,
+      automationTier: a.automationTier ?? getAutomationTier(autopilot),
       branchName,
       workspacePath: autopilot?.workspaceId ?? "",
       leasedPort: port,
-      commitSha: null,
-      paused: false,
-      completedAt: null,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    };
+      createdAt,
+      title: a.title,
+    });
     await upsertDeliveryRun(ctx, run);
 
-    const lease: ReturnType<typeof upsertWorkspaceLease> extends Promise<infer T> ? T extends { data: infer D } ? D : never : never = {} as never;
-
-    const leaseData = {
+    const leaseData = buildWorkspaceLease({
       leaseId: newId(),
       companyId: a.companyId,
       projectId: a.projectId,
@@ -727,24 +611,18 @@ export function registerActionHandlers(ctx: PluginContext) {
       branchName,
       leasedPort: port,
       gitRepoRoot: autopilot?.repoUrl ?? null,
-      isActive: true,
-      createdAt: nowIso(),
-      releasedAt: null,
-    };
+      createdAt,
+    });
     await upsertWorkspaceLease(ctx, leaseData);
 
-    const lock: ProductLock = {
+    const lock = buildProductLock({
       lockId: newId(),
       companyId: a.companyId,
       projectId: a.projectId,
       runId,
-      lockType: "product_lock",
-      targetBranch: branchName,
-      targetPath: "",
-      acquiredAt: nowIso(),
-      releasedAt: null,
-      isActive: true,
-    };
+      branchName,
+      acquiredAt: createdAt,
+    });
     await upsertProductLock(ctx, lock);
 
     await ctx.activity.log({
@@ -760,26 +638,25 @@ export function registerActionHandlers(ctx: PluginContext) {
     const a = args as { companyId: string; projectId: string; runId: string; status: string; commitSha?: string; prUrl?: string; error?: string };
     const run = await getDeliveryRun(ctx, a.companyId, a.projectId, a.runId);
     if (!run) throw new Error("Delivery run not found");
-    const updated: DeliveryRun = {
-      ...run,
+    const updated = updateDeliveryRunStatus({
+      run,
       status: a.status as RunStatus,
-      commitSha: a.commitSha ?? run.commitSha,
+      commitSha: a.commitSha,
       prUrl: a.prUrl,
       error: a.error,
-      completedAt: ["completed","failed","cancelled"].includes(a.status) ? nowIso() : null,
       updatedAt: nowIso(),
-    };
+    });
     await upsertDeliveryRun(ctx, updated);
 
-    if (["completed","failed","cancelled"].includes(a.status)) {
+    if (shouldReleaseRunResources(a.status)) {
       const lease = await getActiveWorkspaceLease(ctx, a.projectId, a.runId);
       if (lease) {
-        await upsertWorkspaceLease(ctx, { ...lease, isActive: false, releasedAt: nowIso() });
+        await upsertWorkspaceLease(ctx, buildReleasedLease(lease, nowIso()));
       }
       const locks = await listProductLocks(ctx, a.companyId, a.projectId);
       const activeLock = locks.find((l) => l.runId === a.runId && l.isActive);
       if (activeLock) {
-        await upsertProductLock(ctx, { ...activeLock, isActive: false, releasedAt: nowIso() });
+        await upsertProductLock(ctx, buildReleasedLock(activeLock, nowIso()));
       }
     }
     return updated;
@@ -789,7 +666,7 @@ export function registerActionHandlers(ctx: PluginContext) {
     const a = args as { companyId: string; projectId: string; runId: string; reason?: string };
     const run = await getDeliveryRun(ctx, a.companyId, a.projectId, a.runId);
     if (!run) throw new Error("Delivery run not found");
-    const updated: DeliveryRun = { ...run, status: "paused", paused: true, pauseReason: a.reason, updatedAt: nowIso() };
+    const updated = buildPausedRun(run, nowIso(), a.reason);
     await upsertDeliveryRun(ctx, updated);
     return updated;
   });
@@ -798,7 +675,7 @@ export function registerActionHandlers(ctx: PluginContext) {
     const a = args as { companyId: string; projectId: string; runId: string };
     const run = await getDeliveryRun(ctx, a.companyId, a.projectId, a.runId);
     if (!run) throw new Error("Delivery run not found");
-    const updated: DeliveryRun = { ...run, status: "running", paused: false, pauseReason: undefined, updatedAt: nowIso() };
+    const updated = buildResumedRun(run, nowIso());
     await upsertDeliveryRun(ctx, updated);
     return updated;
   });
@@ -1084,53 +961,12 @@ export function registerActionHandlers(ctx: PluginContext) {
   ctx.actions.register(ACTION_KEYS.generateStuckRunDigest, async (args) => {
     const r = requireCompanyAndProject(args);
     if (typeof r === "string") throw new Error(r);
-    const stuckRuns = await listStuckRuns(ctx, r.companyId, r.projectId);
-    if (stuckRuns.length === 0) return [];
-    const digest: Digest = {
-      digestId: newId(),
-      companyId: r.companyId,
-      projectId: r.projectId,
-      digestType: "stuck_run",
-      title: `${stuckRuns.length} delivery run(s) may be stuck`,
-      summary: `Runs not updated in over 60 minutes: ${stuckRuns.map((run) => run.runId.slice(0, 8)).join(", ")}`,
-      details: stuckRuns.map((run) => `${run.runId}: ${run.title} (status: ${run.status})`),
-      priority: "high",
-      status: "pending",
-      deliveredAt: null,
-      readAt: null,
-      dismissedAt: null,
-      relatedRunId: stuckRuns[0]?.runId,
-      createdAt: nowIso(),
-    };
-    await upsertDigest(ctx, digest);
-    return digest;
+    return await generateStuckRunDigest(ctx, r.companyId, r.projectId);
   });
 
   ctx.actions.register(ACTION_KEYS.generateBudgetAlertDigest, async (args) => {
     const a = args as { companyId: string; projectId: string };
-    const budget = await getCompanyBudget(ctx, a.companyId);
-    if (!budget) return undefined;
-    const usagePct = Math.round((budget.autopilotUsedMinutes / budget.autopilotBudgetMinutes) * 100);
-    if (usagePct < 80) return undefined;
-
-    const digest: Digest = {
-      digestId: newId(),
-      companyId: a.companyId,
-      projectId: a.projectId,
-      digestType: "budget_alert",
-      title: `Autopilot budget at ${usagePct}%`,
-      summary: `Autopilot has used ${budget.autopilotUsedMinutes}/${budget.autopilotBudgetMinutes} minutes`,
-      details: [],
-      priority: usagePct >= 95 ? "critical" : "high",
-      status: "pending",
-      deliveredAt: null,
-      readAt: null,
-      dismissedAt: null,
-      relatedBudgetId: budget.budgetId,
-      createdAt: nowIso(),
-    };
-    await upsertDigest(ctx, digest);
-    return digest;
+    return await generateBudgetAlertDigest(ctx, a.companyId, a.projectId);
   });
 
   ctx.actions.register(ACTION_KEYS.createReleaseHealthCheck, async (args) => {
@@ -1282,28 +1118,22 @@ export function registerToolHandlers(ctx: PluginContext) {
   }, async (params, _runCtx): Promise<ToolResult> => {
     const a = params as { companyId: string; projectId: string; ideaId: string; decision: SwipeDecision; note?: string };
     if (!isSwipeDecision(a.decision)) return { content: `Error: invalid decision "${a.decision}"` };
-
-    const idea = await getIdea(ctx, a.companyId, a.projectId, a.ideaId);
-    if (!idea) return { content: `Error: idea ${a.ideaId} not found` };
-
-    const swipe: SwipeEvent = {
-      swipeId: newId(),
-      companyId: a.companyId,
-      projectId: a.projectId,
-      ideaId: a.ideaId,
-      decision: a.decision,
-      note: a.note,
-      createdAt: nowIso(),
-    };
-    await upsertSwipeEvent(ctx, swipe);
-
-    let newStatus: IdeaStatus = idea.status;
-    if (a.decision === "pass") newStatus = "rejected";
-    else if (a.decision === "maybe") newStatus = "maybe";
-    else if (a.decision === "yes" || a.decision === "now") newStatus = "approved";
-
-    await upsertIdea(ctx, { ...idea, status: newStatus, updatedAt: nowIso() });
-    return { content: `Swipe recorded: ${a.decision}\nIdea status: ${newStatus}` };
+    try {
+      const result = await processSwipeDecision(ctx, a);
+      const extras = [
+        result.planningArtifact ? `Planning artifact: ${result.planningArtifact.artifactId}` : undefined,
+        result.deliveryRun ? `Delivery run: ${result.deliveryRun.runId}` : undefined,
+      ].filter(Boolean);
+      return {
+        content: [
+          `Swipe recorded: ${a.decision}`,
+          `Idea status: ${result.idea.status}`,
+          ...extras,
+        ].join("\n"),
+      };
+    } catch (error) {
+      return { content: `Error: ${error instanceof Error ? error.message : String(error)}` };
+    }
   });
 
   ctx.tools.register(TOOL_KEYS.startResearchCycle, {
@@ -1383,6 +1213,130 @@ export function registerToolHandlers(ctx: PluginContext) {
   });
 }
 
+type SwipeDecisionInput = {
+  companyId: string;
+  projectId: string;
+  ideaId: string;
+  decision: SwipeDecision;
+  note?: string;
+};
+
+async function processSwipeDecision(ctx: PluginContext, input: SwipeDecisionInput) {
+  const idea = await getIdea(ctx, input.companyId, input.projectId, input.ideaId);
+  if (!idea) throw new Error("Idea not found");
+
+  const timestamp = nowIso();
+  const swipe = buildSwipeEvent({
+    swipeId: newId(),
+    companyId: input.companyId,
+    projectId: input.projectId,
+    ideaId: input.ideaId,
+    decision: input.decision,
+    note: input.note,
+    createdAt: timestamp,
+  });
+  await upsertSwipeEvent(ctx, swipe);
+
+  const updatedIdea = applySwipeToIdea(idea, input.decision, timestamp);
+  await upsertIdea(ctx, updatedIdea);
+
+  let profile = await getPreferenceProfile(ctx, input.companyId, input.projectId);
+  if (!profile) {
+    profile = createEmptyPreferenceProfile({
+      profileId: newId(),
+      companyId: input.companyId,
+      projectId: input.projectId,
+      lastUpdated: timestamp,
+    });
+  }
+  const updatedProfile = applySwipeToPreferenceProfile(profile, input.decision, idea);
+  await upsertPreferenceProfile(ctx, updatedProfile);
+
+  const autopilot = await getAutopilotProject(ctx, input.companyId, input.projectId);
+  let planningArtifact: PlanningArtifact | undefined;
+  let deliveryRun: DeliveryRun | undefined;
+  let workspaceLease;
+  let productLock;
+
+  if ((input.decision === "yes" || input.decision === "now") && autopilot?.enabled) {
+    const artifactId = newId();
+    planningArtifact = buildPlanningArtifact({
+      artifactId,
+      companyId: input.companyId,
+      projectId: input.projectId,
+      ideaId: input.ideaId,
+      idea,
+      automationTier: autopilot.automationTier,
+      createdAt: timestamp,
+    });
+    await upsertPlanningArtifact(ctx, planningArtifact);
+
+    if (shouldCreateDeliveryRun({
+      decision: input.decision,
+      autopilotEnabled: autopilot.enabled,
+      automationTier: autopilot.automationTier,
+    })) {
+      const runId = newId();
+      const branchName = generateBranchName(input.projectId, input.ideaId);
+      const leasedPort = allocatePort();
+      deliveryRun = buildPendingDeliveryRun({
+        runId,
+        companyId: input.companyId,
+        projectId: input.projectId,
+        ideaId: input.ideaId,
+        artifactId,
+        idea,
+        automationTier: autopilot.automationTier,
+        branchName,
+        workspacePath: autopilot.workspaceId ?? "",
+        leasedPort,
+        createdAt: timestamp,
+      });
+      await upsertDeliveryRun(ctx, deliveryRun);
+
+      workspaceLease = buildWorkspaceLease({
+        leaseId: newId(),
+        companyId: input.companyId,
+        projectId: input.projectId,
+        runId,
+        workspacePath: autopilot.workspaceId ?? "",
+        branchName,
+        leasedPort,
+        gitRepoRoot: autopilot.repoUrl ?? null,
+        createdAt: timestamp,
+      });
+      await upsertWorkspaceLease(ctx, workspaceLease);
+
+      productLock = buildProductLock({
+        lockId: newId(),
+        companyId: input.companyId,
+        projectId: input.projectId,
+        runId,
+        branchName,
+        acquiredAt: timestamp,
+      });
+      await upsertProductLock(ctx, productLock);
+    }
+  }
+
+  await ctx.activity.log({
+    companyId: input.companyId,
+    message: `Swipe ${input.decision} on idea: ${idea.title.slice(0, 60)}`,
+    entityType: "swipe-event",
+    entityId: swipe.swipeId,
+  });
+
+  return {
+    swipe,
+    idea: updatedIdea,
+    profile: updatedProfile,
+    planningArtifact,
+    deliveryRun,
+    workspaceLease,
+    productLock,
+  };
+}
+
 // ─── JOB HANDLERS ──────────────────────────────────────────────────────────────
 export function registerJobHandlers(ctx: PluginContext) {
 
@@ -1420,7 +1374,7 @@ export function registerJobHandlers(ctx: PluginContext) {
 
         const maybeIdeas = await listMaybePoolIdeas(ctx, ap.companyId, ap.projectId);
         for (const idea of maybeIdeas) {
-          if (new Date(idea.updatedAt) <= new Date(threshold)) {
+          if (shouldResurfaceIdea(idea, threshold)) {
             await upsertIdea(ctx, { ...idea, status: "active", updatedAt: nowIso() });
             await ctx.activity.log({
               companyId: ap.companyId,
@@ -1468,55 +1422,56 @@ async function checkBudgetAndPauseIfNeeded(ctx: PluginContext, companyId: string
   const autopilot = await getAutopilotProject(ctx, companyId, projectId);
   if (!autopilot) return;
 
-  if (budget && budget.autopilotUsedMinutes >= budget.autopilotBudgetMinutes) {
+  if (shouldPauseForBudget(autopilot, budget)) {
     await upsertAutopilotProject(ctx, { ...autopilot, paused: true, pauseReason: "Budget exhausted", updatedAt: nowIso() });
   }
 }
 
-async function generateBudgetAlertDigest(ctx: PluginContext, companyId: string, projectId: string) {
-  const budget = await getCompanyBudget(ctx, companyId);
-  if (!budget) return;
-  const usagePct = Math.round((budget.autopilotUsedMinutes / budget.autopilotBudgetMinutes) * 100);
-  if (usagePct < 80) return;
-
-  const digest: Digest = {
-    digestId: newId(),
-    companyId,
-    projectId,
-    digestType: "budget_alert",
-    title: `Autopilot budget at ${usagePct}%`,
-    summary: `Autopilot has used ${budget.autopilotUsedMinutes}/${budget.autopilotBudgetMinutes} minutes`,
-    details: [],
-    priority: usagePct >= 95 ? "critical" : "high",
-    status: "pending",
-    deliveredAt: null,
-    readAt: null,
-    dismissedAt: null,
-    relatedBudgetId: budget.budgetId,
-    createdAt: nowIso(),
-  };
-  await upsertDigest(ctx, digest);
+function hasPendingDigest(
+  digests: Digest[],
+  digestType: Digest["digestType"],
+  predicate: (digest: Digest) => boolean,
+): boolean {
+  return digests.some((digest) => digest.digestType === digestType && digest.status === "pending" && predicate(digest));
 }
 
-async function generateStuckRunDigest(ctx: PluginContext, companyId: string, projectId: string) {
-  const stuckRuns = await listStuckRuns(ctx, companyId, projectId);
-  if (stuckRuns.length === 0) return;
-
-  const digest: Digest = {
+async function generateBudgetAlertDigest(ctx: PluginContext, companyId: string, projectId: string): Promise<Digest | undefined> {
+  const budget = await getCompanyBudget(ctx, companyId);
+  if (!budget) return undefined;
+  const digest = buildBudgetAlertDigest({
     digestId: newId(),
     companyId,
     projectId,
-    digestType: "stuck_run",
-    title: `${stuckRuns.length} delivery run(s) may be stuck`,
-    summary: `Runs not updated in over 60 minutes: ${stuckRuns.map((r) => r.runId.slice(0, 8)).join(", ")}`,
-    details: stuckRuns.map((r) => `${r.runId}: ${r.title} (status: ${r.status})`),
-    priority: "high",
-    status: "pending",
-    deliveredAt: null,
-    readAt: null,
-    dismissedAt: null,
-    relatedRunId: stuckRuns[0]?.runId,
+    budget,
     createdAt: nowIso(),
-  };
+  });
+  if (!digest) return undefined;
+
+  const existingDigests = await listDigests(ctx, companyId, projectId);
+  if (hasPendingDigest(existingDigests, "budget_alert", (existing) => existing.relatedBudgetId === digest.relatedBudgetId)) {
+    return undefined;
+  }
+
   await upsertDigest(ctx, digest);
+  return digest;
+}
+
+async function generateStuckRunDigest(ctx: PluginContext, companyId: string, projectId: string): Promise<Digest | undefined> {
+  const stuckRuns = await listStuckRuns(ctx, companyId, projectId);
+  const digest = buildStuckRunDigest({
+    digestId: newId(),
+    companyId,
+    projectId,
+    stuckRuns,
+    createdAt: nowIso(),
+  });
+  if (!digest) return undefined;
+
+  const existingDigests = await listDigests(ctx, companyId, projectId);
+  if (hasPendingDigest(existingDigests, "stuck_run", (existing) => existing.relatedRunId === digest.relatedRunId)) {
+    return undefined;
+  }
+
+  await upsertDigest(ctx, digest);
+  return digest;
 }
