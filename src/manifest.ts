@@ -24,6 +24,8 @@ const manifest: PaperclipPluginManifestV1 = {
     "activity.log.write",
     "agent.tools.register",
     "jobs.schedule",
+    "metrics.write",
+    "telemetry.track",
     "ui.page.register",
     "ui.detailTab.register",
     "ui.sidebar.register",

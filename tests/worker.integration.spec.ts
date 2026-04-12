@@ -263,4 +263,61 @@ describe("worker integration", () => {
     expect(digestTypes.filter((type) => type === "stuck_run")).toHaveLength(1);
     expect(projects[0]?.data.paused).toBe(true);
   });
+
+  it("emits metrics and telemetry for checkpoint, health-check, and rollback actions", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertIdea(harness.ctx, createIdea());
+    const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-1",
+      artifactId: "artifact-1",
+    });
+
+    const checkpoint = await harness.performAction<{ checkpointId: string }>(ACTION_KEYS.createCheckpoint, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      label: "Checkpoint A",
+    });
+    const check = await harness.performAction<{ checkId: string }>(ACTION_KEYS.createReleaseHealthCheck, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkType: "smoke_test",
+      name: "Smoke",
+    });
+    await harness.performAction(ACTION_KEYS.updateReleaseHealthStatus, {
+      companyId: "company-1",
+      projectId: "project-1",
+      checkId: check.checkId,
+      status: "failed",
+      errorMessage: "boom",
+    });
+    await harness.performAction(ACTION_KEYS.triggerRollback, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkId: check.checkId,
+      rollbackType: "restore_checkpoint",
+      checkpointId: checkpoint.checkpointId,
+    });
+
+    expect(harness.metrics.map((entry) => entry.name)).toEqual(
+      expect.arrayContaining([
+        "checkpoint.created",
+        "release_health.created",
+        "release_health.updated",
+        "rollback.triggered",
+      ]),
+    );
+    expect(harness.telemetry.map((entry) => entry.eventName)).toEqual(
+      expect.arrayContaining([
+        "checkpoint_created",
+        "release_health_created",
+        "release_health_updated",
+        "rollback_triggered",
+      ]),
+    );
+  });
 });

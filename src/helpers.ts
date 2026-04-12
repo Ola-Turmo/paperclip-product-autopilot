@@ -33,10 +33,14 @@ import type {
 } from "./constants.js";
 import {
   autopilotProjectSchema,
+  checkpointSchema,
   companyBudgetSchema,
   deliveryRunSchema,
+  digestSchema,
   ideaSchema,
   preferenceProfileSchema,
+  releaseHealthCheckSchema,
+  rollbackActionSchema,
   researchCycleSchema,
 } from "./schemas.js";
 
@@ -749,14 +753,15 @@ export async function upsertCheckpoint(
   ctx: PluginContext,
   checkpoint: Checkpoint
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(checkpointSchema, checkpoint);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.checkpoint,
     scopeKind: "project",
-    scopeId: checkpoint.projectId,
-    externalId: checkpoint.checkpointId,
-    title: checkpoint.label ?? `Checkpoint ${checkpoint.checkpointId.slice(0, 8)}`,
+    scopeId: validated.projectId,
+    externalId: validated.checkpointId,
+    title: validated.label ?? `Checkpoint ${validated.checkpointId.slice(0, 8)}`,
     status: "active",
-    data: checkpoint as unknown as Record<string, unknown>,
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -942,14 +947,15 @@ export async function upsertDigest(
   ctx: PluginContext,
   digest: Digest
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(digestSchema, digest);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.digest,
     scopeKind: "project",
-    scopeId: digest.projectId,
-    externalId: digest.digestId,
-    title: digest.title.slice(0, 80),
-    status: digest.status,
-    data: digest as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.digestId,
+    title: validated.title.slice(0, 80),
+    status: validated.status,
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -978,14 +984,15 @@ export async function upsertReleaseHealthCheck(
   ctx: PluginContext,
   check: ReleaseHealthCheck
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(releaseHealthCheckSchema, check);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.releaseHealth,
     scopeKind: "project",
-    scopeId: check.projectId,
-    externalId: check.checkId,
-    title: check.name,
-    status: checkStatusToEntityStatus(check.status),
-    data: check as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.checkId,
+    title: validated.name,
+    status: checkStatusToEntityStatus(validated.status),
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -1020,14 +1027,15 @@ export async function upsertRollbackAction(
   ctx: PluginContext,
   action: RollbackAction
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(rollbackActionSchema, action);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.rollbackAction,
     scopeKind: "project",
-    scopeId: action.projectId,
-    externalId: action.rollbackId,
-    title: `Rollback ${action.rollbackType}`,
-    status: rollbackStatusToEntityStatus(action.status),
-    data: action as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.rollbackId,
+    title: `Rollback ${validated.rollbackType}`,
+    status: rollbackStatusToEntityStatus(validated.status),
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 

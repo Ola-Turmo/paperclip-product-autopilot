@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   autopilotProjectSchema,
+  checkpointSchema,
   companyBudgetSchema,
   deliveryRunSchema,
+  digestSchema,
   ideaSchema,
+  releaseHealthCheckSchema,
+  rollbackActionSchema,
 } from "../src/schemas.js";
 
 describe("runtime schemas", () => {
@@ -96,5 +100,69 @@ describe("runtime schemas", () => {
 
     expect(run.status).toBe("running");
     expect(idea.status).toBe("active");
+  });
+
+  it("accepts checkpoint, digest, release-health, and rollback payloads", () => {
+    expect(
+      checkpointSchema.parse({
+        checkpointId: "checkpoint-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-1",
+        snapshotState: {},
+        taskStates: { "task-1": "running" },
+        workspaceSnapshot: {
+          branchName: "autopilot/project1/idea1",
+          commitSha: null,
+          workspacePath: "/tmp/project",
+          leasedPort: 3000,
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }).runId,
+    ).toBe("run-1");
+
+    expect(
+      digestSchema.parse({
+        digestId: "digest-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        digestType: "stuck_run",
+        title: "Stuck",
+        summary: "Run stuck",
+        details: [],
+        priority: "high",
+        status: "pending",
+        deliveredAt: null,
+        readAt: null,
+        dismissedAt: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }).digestType,
+    ).toBe("stuck_run");
+
+    expect(
+      releaseHealthCheckSchema.parse({
+        checkId: "check-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-1",
+        checkType: "smoke_test",
+        name: "Smoke",
+        status: "pending",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }).checkType,
+    ).toBe("smoke_test");
+
+    expect(
+      rollbackActionSchema.parse({
+        rollbackId: "rollback-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-1",
+        checkId: "check-1",
+        rollbackType: "restore_checkpoint",
+        status: "pending",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }).rollbackType,
+    ).toBe("restore_checkpoint");
   });
 });

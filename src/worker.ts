@@ -121,6 +121,14 @@ import {
   shouldReleaseRunResources,
   updateDeliveryRunStatus,
 } from "./services/delivery.js";
+import {
+  buildCheckpoint,
+  buildReleaseHealthCheck,
+  buildRestoredConvoyTask,
+  buildRollbackAction,
+  checkpointSummary,
+  updateReleaseHealthCheck,
+} from "./services/lifecycle.js";
 import { shouldResurfaceIdea } from "./services/resurface.js";
 import {
   applySwipeToIdea,
@@ -158,6 +166,23 @@ function requireCompanyAndProject(
   if (!isNonEmptyString(args.companyId)) return "companyId is required";
   if (!isNonEmptyString(args.projectId)) return "projectId is required";
   return { companyId: args.companyId as string, projectId: args.projectId as string };
+}
+
+async function recordLifecycleSignals(
+  ctx: PluginContext,
+  eventName: string,
+  companyId: string,
+  metricName?: string,
+  metricValue = 1,
+  tags?: Record<string, string>,
+) {
+  if (metricName) {
+    await ctx.metrics.write(metricName, metricValue, tags);
+  }
+  await ctx.telemetry.track(eventName, {
+    companyId,
+    ...(tags ?? {}),
+  });
 }
 
 // ─── Main plugin ────────────────────────────────────────────────────────────────
@@ -776,29 +801,27 @@ export function registerActionHandlers(ctx: PluginContext) {
     const a = args as { companyId: string; projectId: string; runId: string; label?: string; pauseReason?: string };
     const run = await getDeliveryRun(ctx, a.companyId, a.projectId, a.runId);
     const tasks = await listConvoyTasks(ctx, a.companyId, a.projectId, a.runId);
-    const checkpoint: Checkpoint = {
+    const checkpoint = buildCheckpoint({
       checkpointId: newId(),
       companyId: a.companyId,
       projectId: a.projectId,
       runId: a.runId,
+      run: run ?? null,
+      tasks,
       label: a.label,
-      snapshotState: { runStatus: run?.status },
-      taskStates: Object.fromEntries(tasks.map((t) => [t.taskId, t.status])),
-      workspaceSnapshot: {
-        branchName: run?.branchName ?? "",
-        commitSha: run?.commitSha ?? null,
-        workspacePath: run?.workspacePath ?? "",
-        leasedPort: run?.leasedPort ?? null,
-      },
       pauseReason: a.pauseReason,
       createdAt: nowIso(),
-    };
+    });
     await upsertCheckpoint(ctx, checkpoint);
     await ctx.activity.log({
       companyId: a.companyId,
-      message: `Checkpoint created for run ${a.runId.slice(0, 8)}: ${a.label ?? ""}`,
+      message: `Checkpoint created for run ${a.runId.slice(0, 8)}: ${checkpointSummary(checkpoint)}`,
       entityType: "checkpoint",
       entityId: checkpoint.checkpointId,
+    });
+    await recordLifecycleSignals(ctx, "checkpoint_created", a.companyId, "checkpoint.created", 1, {
+      projectId: a.projectId,
+      runId: a.runId,
     });
     return checkpoint;
   });
@@ -813,9 +836,13 @@ export function registerActionHandlers(ctx: PluginContext) {
       const tasks = await listConvoyTasks(ctx, a.companyId, a.projectId, a.runId);
       const task = tasks.find((t) => t.taskId === taskId);
       if (task) {
-        await upsertConvoyTask(ctx, { ...task, status: status as ConvoyTaskStatus, updatedAt: nowIso() });
+        await upsertConvoyTask(ctx, buildRestoredConvoyTask(task, status as ConvoyTaskStatus, nowIso()));
       }
     }
+    await recordLifecycleSignals(ctx, "checkpoint_restored", a.companyId, "checkpoint.restored", 1, {
+      projectId: a.projectId,
+      runId: a.runId,
+    });
     return checkpoint;
   });
 
@@ -971,17 +998,21 @@ export function registerActionHandlers(ctx: PluginContext) {
 
   ctx.actions.register(ACTION_KEYS.createReleaseHealthCheck, async (args) => {
     const a = args as { companyId: string; projectId: string; runId: string; checkType: string; name: string };
-    const check: ReleaseHealthCheck = {
+    const check = buildReleaseHealthCheck({
       checkId: newId(),
       companyId: a.companyId,
       projectId: a.projectId,
       runId: a.runId,
       checkType: a.checkType as ReleaseHealthCheck["checkType"],
       name: a.name,
-      status: "pending",
       createdAt: nowIso(),
-    };
+    });
     await upsertReleaseHealthCheck(ctx, check);
+    await recordLifecycleSignals(ctx, "release_health_created", a.companyId, "release_health.created", 1, {
+      projectId: a.projectId,
+      runId: a.runId,
+      checkType: a.checkType,
+    });
     return check;
   });
 
@@ -990,32 +1021,40 @@ export function registerActionHandlers(ctx: PluginContext) {
     const checks = await listReleaseHealthChecks(ctx, a.companyId, a.projectId);
     const check = checks.find((c) => c.checkId === a.checkId);
     if (!check) throw new Error("Health check not found");
-    const updated: ReleaseHealthCheck = {
-      ...check,
-      status: a.status as ReleaseHealthCheck["status"],
-      errorMessage: a.errorMessage,
-      passedAt: a.status === "passed" ? nowIso() : check.passedAt,
-      failedAt: a.status === "failed" ? nowIso() : check.failedAt,
-    };
+    const updated = updateReleaseHealthCheck(
+      check,
+      a.status as ReleaseHealthCheck["status"],
+      nowIso(),
+      a.errorMessage,
+    );
     await upsertReleaseHealthCheck(ctx, updated);
+    await recordLifecycleSignals(ctx, "release_health_updated", a.companyId, "release_health.updated", 1, {
+      projectId: a.projectId,
+      runId: check.runId,
+      status: a.status,
+    });
     return updated;
   });
 
   ctx.actions.register(ACTION_KEYS.triggerRollback, async (args) => {
     const a = args as { companyId: string; projectId: string; runId: string; checkId: string; rollbackType: string; targetCommitSha?: string; checkpointId?: string };
-    const rollback: RollbackAction = {
+    const rollback = buildRollbackAction({
       rollbackId: newId(),
       companyId: a.companyId,
       projectId: a.projectId,
       runId: a.runId,
       checkId: a.checkId,
       rollbackType: a.rollbackType as RollbackAction["rollbackType"],
-      status: "pending",
       targetCommitSha: a.targetCommitSha,
       checkpointId: a.checkpointId,
       createdAt: nowIso(),
-    };
+    });
     await upsertRollbackAction(ctx, rollback);
+    await recordLifecycleSignals(ctx, "rollback_triggered", a.companyId, "rollback.triggered", 1, {
+      projectId: a.projectId,
+      runId: a.runId,
+      rollbackType: a.rollbackType,
+    });
     return rollback;
   });
 

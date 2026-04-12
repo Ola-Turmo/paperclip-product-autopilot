@@ -13,6 +13,21 @@ const ideaStatusSchema = z.enum([
 const researchStatusSchema = z.enum(["pending", "running", "completed", "failed"]);
 const runStatusSchema = z.enum(["pending", "running", "paused", "completed", "failed", "cancelled"]);
 const complexitySchema = z.enum(["low", "medium", "high"]);
+const convoyTaskStatusSchema = z.enum(["pending", "blocked", "running", "passed", "failed", "skipped"]);
+const digestStatusSchema = z.enum(["pending", "delivered", "read", "dismissed"]);
+const digestPrioritySchema = z.enum(["low", "medium", "high", "critical"]);
+const digestTypeSchema = z.enum([
+  "budget_alert",
+  "stuck_run",
+  "opportunity",
+  "weekly_summary",
+  "health_check_failed",
+  "idea_resurface",
+]);
+const healthCheckStatusSchema = z.enum(["pending", "running", "passed", "failed", "skipped"]);
+const healthCheckTypeSchema = z.enum(["smoke_test", "integration_test", "custom_check", "merge_check"]);
+const rollbackStatusSchema = z.enum(["pending", "in_progress", "completed", "failed", "skipped"]);
+const rollbackTypeSchema = z.enum(["revert_commit", "restore_checkpoint", "full_rollback"]);
 
 export const autopilotProjectSchema = z.object({
   autopilotId: z.string().min(1),
@@ -131,4 +146,69 @@ export const companyBudgetSchema = z.object({
   paused: z.boolean(),
   pauseReason: z.string().optional(),
   updatedAt: z.string().min(1),
+});
+
+export const checkpointSchema = z.object({
+  checkpointId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  runId: z.string().min(1),
+  label: z.string().optional(),
+  snapshotState: z.record(z.unknown()),
+  taskStates: z.record(convoyTaskStatusSchema),
+  workspaceSnapshot: z.object({
+    branchName: z.string(),
+    commitSha: z.string().nullable(),
+    workspacePath: z.string(),
+    leasedPort: z.number().nullable(),
+  }),
+  pauseReason: z.string().optional(),
+  createdAt: z.string().min(1),
+});
+
+export const digestSchema = z.object({
+  digestId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  digestType: digestTypeSchema,
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  details: z.array(z.string()),
+  priority: digestPrioritySchema,
+  status: digestStatusSchema,
+  deliveredAt: z.string().nullable(),
+  readAt: z.string().nullable(),
+  dismissedAt: z.string().nullable(),
+  relatedRunId: z.string().optional(),
+  relatedBudgetId: z.string().optional(),
+  createdAt: z.string().min(1),
+});
+
+export const releaseHealthCheckSchema = z.object({
+  checkId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  runId: z.string().min(1),
+  checkType: healthCheckTypeSchema,
+  name: z.string().min(1),
+  status: healthCheckStatusSchema,
+  errorMessage: z.string().optional(),
+  failedAt: z.string().optional(),
+  passedAt: z.string().optional(),
+  createdAt: z.string().min(1),
+});
+
+export const rollbackActionSchema = z.object({
+  rollbackId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  runId: z.string().min(1),
+  checkId: z.string().min(1),
+  rollbackType: rollbackTypeSchema,
+  status: rollbackStatusSchema,
+  targetCommitSha: z.string().optional(),
+  checkpointId: z.string().optional(),
+  errorMessage: z.string().optional(),
+  completedAt: z.string().optional(),
+  createdAt: z.string().min(1),
 });
