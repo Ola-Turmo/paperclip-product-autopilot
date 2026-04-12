@@ -4,7 +4,6 @@
   "type": "module",
   "description": "Product Autopilot plugin for Paperclip — autonomous product-improvement loop: research, ideation, swipe review, delivery pipeline",
   "scripts": {
-    "prebuild": "node scripts/ensure-plugin-build-deps.mjs",
     "build": "node esbuild.config.mjs",
     "build:rollup": "rollup -c",
     "dev": "node esbuild.config.mjs --watch",

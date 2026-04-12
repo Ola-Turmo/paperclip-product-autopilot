@@ -157,7 +157,7 @@ export default plugin;
 runWorker(plugin, import.meta.url);
 
 // ─── DATA HANDLERS ──────────────────────────────────────────────────────────────
-function registerDataHandlers(ctx: PluginContext) {
+export function registerDataHandlers(ctx: PluginContext) {
 
   ctx.data.register(DATA_KEYS.autopilotProject, async (args) => {
     const { companyId, projectId } = args as { companyId: string; projectId: string };
@@ -334,7 +334,7 @@ function registerDataHandlers(ctx: PluginContext) {
 }
 
 // ─── ACTION HANDLERS ───────────────────────────────────────────────────────────
-function registerActionHandlers(ctx: PluginContext) {
+export function registerActionHandlers(ctx: PluginContext) {
 
   ctx.actions.register(ACTION_KEYS.saveAutopilotProject, async (args) => {
     const a = args as Partial<AutopilotProject> & { companyId: string; projectId: string };
@@ -1191,7 +1191,7 @@ function registerActionHandlers(ctx: PluginContext) {
 }
 
 // ─── TOOL HANDLERS ─────────────────────────────────────────────────────────────
-function registerToolHandlers(ctx: PluginContext) {
+export function registerToolHandlers(ctx: PluginContext) {
 
   ctx.tools.register(TOOL_KEYS.listAutopilotProjects, {
     displayName: "List Autopilot Projects",
@@ -1384,7 +1384,7 @@ function registerToolHandlers(ctx: PluginContext) {
 }
 
 // ─── JOB HANDLERS ──────────────────────────────────────────────────────────────
-function registerJobHandlers(ctx: PluginContext) {
+export function registerJobHandlers(ctx: PluginContext) {
 
   ctx.jobs.register(JOB_KEYS.autopilotSweep, async (_job: PluginJobContext) => {
     ctx.logger.info("Autopilot sweep job running");
