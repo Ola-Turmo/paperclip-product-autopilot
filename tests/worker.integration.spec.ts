@@ -3,8 +3,8 @@ import { createTestHarness } from "@paperclipai/plugin-sdk/testing";
 import manifest from "../src/manifest.js";
 import plugin from "../src/worker.js";
 import { ACTION_KEYS, ENTITY_TYPES, JOB_KEYS, TOOL_KEYS } from "../src/constants.js";
-import { upsertAutopilotProject, upsertCompanyBudget, upsertDeliveryRun, upsertIdea } from "../src/helpers.js";
-import type { AutopilotProject, CompanyBudget, DeliveryRun, Idea } from "../src/types.js";
+import { upsertAutopilotProject, upsertCompanyBudget, upsertDeliveryRun, upsertIdea, upsertPreferenceProfile, upsertResearchCycle, upsertResearchFinding } from "../src/helpers.js";
+import type { AutopilotProject, CompanyBudget, DeliveryRun, Idea, PreferenceProfile, ResearchCycle, ResearchFinding } from "../src/types.js";
 
 function createProject(overrides: Partial<AutopilotProject> = {}): AutopilotProject {
   return {
@@ -55,6 +55,57 @@ function createBudget(overrides: Partial<CompanyBudget> = {}): CompanyBudget {
     autopilotUsedMinutes: 100,
     paused: false,
     updatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function createPreferenceProfile(overrides: Partial<PreferenceProfile> = {}): PreferenceProfile {
+  return {
+    profileId: "profile-1",
+    companyId: "company-1",
+    projectId: "project-1",
+    passCount: 0,
+    maybeCount: 1,
+    yesCount: 2,
+    nowCount: 2,
+    totalSwipes: 5,
+    categoryPreferences: {
+      user_feedback: { pass: 0, maybe: 1, yes: 2, now: 2 },
+    },
+    tagPreferences: {},
+    avgApprovedScore: 78,
+    avgRejectedScore: 32,
+    lastUpdated: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function createResearchCycle(overrides: Partial<ResearchCycle> = {}): ResearchCycle {
+  return {
+    cycleId: "cycle-1",
+    companyId: "company-1",
+    projectId: "project-1",
+    status: "running",
+    query: "Research product opportunities",
+    findingsCount: 0,
+    startedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFinding {
+  return {
+    findingId: "finding-1",
+    companyId: "company-1",
+    projectId: "project-1",
+    cycleId: "cycle-1",
+    title: "Improve onboarding completion",
+    description: "Users drop before activation",
+    sourceUrl: "https://example.com/support",
+    sourceLabel: "support-summary",
+    category: "user_feedback",
+    confidence: 0.9,
+    createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
 }
@@ -388,5 +439,30 @@ describe("worker integration", () => {
 
     expect(dismissed.status).toBe("dismissed");
     expect(dismissed.dismissedAt).toBeTruthy();
+  });
+
+  it("generates ideas deterministically from ranked research findings", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertPreferenceProfile(harness.ctx, createPreferenceProfile());
+    await upsertResearchCycle(harness.ctx, createResearchCycle());
+    await upsertResearchFinding(harness.ctx, createFinding({ findingId: "finding-1", title: "Improve onboarding completion", category: "user_feedback", confidence: 0.92 }));
+    await upsertResearchFinding(harness.ctx, createFinding({ findingId: "finding-2", title: "Investigate merge queue friction", category: "technical", confidence: 0.75 }));
+
+    const toolResult = await harness.executeTool(TOOL_KEYS.generateIdeas, {
+      companyId: "company-1",
+      projectId: "project-1",
+      count: 2,
+    });
+
+    const ideas = await harness.ctx.entities.list({
+      entityType: ENTITY_TYPES.idea,
+      scopeKind: "project",
+      scopeId: "project-1",
+    });
+
+    expect(toolResult.content).toContain("Generated 2 ideas");
+    expect(ideas[0]?.data.title).toContain("Improve onboarding completion");
+    expect(ideas[0]?.data.impactScore).toBeGreaterThanOrEqual(ideas[1]?.data.impactScore);
+    expect(ideas[0]?.data.sourceReferences).toEqual(["https://example.com/support"]);
   });
 });

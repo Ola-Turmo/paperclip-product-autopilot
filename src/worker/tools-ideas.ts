@@ -4,6 +4,7 @@ import type { SwipeDecision } from "../constants.js";
 import type { Idea } from "../types.js";
 import { findDuplicateIdea, newId, nowIso } from "../helpers.js";
 import { createAutopilotRepository } from "../repositories/autopilot.js";
+import { buildIdeaDraftFromFinding, rankFindingsForIdeation } from "../services/ideation.js";
 import { processSwipeDecision } from "../services/orchestration.js";
 import { parsePositiveInt } from "./action-utils.js";
 
@@ -120,30 +121,58 @@ export function registerIdeaToolHandlers(ctx: PluginContext) {
   }, async (params, _runCtx): Promise<ToolResult> => {
     const a = params as { companyId: string; projectId: string; count?: number };
     const count = parsePositiveInt(a.count, 5);
-    const findings = await repo.listResearchFindings(a.companyId, a.projectId);
+    const [findings, profile] = await Promise.all([
+      repo.listResearchFindings(a.companyId, a.projectId),
+      repo.getPreferenceProfile(a.companyId, a.projectId),
+    ]);
+    const rankedFindings = rankFindingsForIdeation(findings, profile);
     const created: Idea[] = [];
+    const seenDuplicateIds = new Set<string>();
 
-    for (let i = 0; i < count; i++) {
-      const finding = findings[i % Math.max(findings.length, 1)];
-      const idea: Idea = {
+    for (const finding of rankedFindings) {
+      if (created.length >= count) break;
+      const idea = buildIdeaDraftFromFinding({
+        finding,
+        companyId: a.companyId,
+        projectId: a.projectId,
+        ideaId: newId(),
+        createdAt: nowIso(),
+        profile,
+      });
+      const duplicate = await findDuplicateIdea(ctx, a.companyId, a.projectId, idea.title, idea.description);
+      if (duplicate) {
+        if (seenDuplicateIds.has(duplicate.idea.ideaId)) {
+          continue;
+        }
+        seenDuplicateIds.add(duplicate.idea.ideaId);
+        idea.duplicateOfIdeaId = duplicate.idea.ideaId;
+        idea.duplicateAnnotated = true;
+      }
+      await repo.upsertIdea(idea);
+      created.push(idea);
+    }
+
+    if (created.length === 0 && count > 0) {
+      const fallback: Idea = {
         ideaId: newId(),
         companyId: a.companyId,
         projectId: a.projectId,
-        title: finding ? `Improve: ${finding.title}` : `Idea ${i + 1}`,
-        description: finding?.description ?? "Generated from research insights",
-        rationale: finding ? `Based on research: ${finding.title}` : "",
-        sourceReferences: finding?.sourceUrl ? [finding.sourceUrl] : [],
-        impactScore: Math.round(40 + Math.random() * 50),
-        feasibilityScore: Math.round(40 + Math.random() * 50),
+        title: "Improve product experience",
+        description: "Generated without current research findings",
+        rationale: "Fallback idea because no ranked research findings were available",
+        sourceReferences: [],
+        impactScore: 50,
+        feasibilityScore: 50,
         complexityEstimate: "medium",
-        category: finding?.category ?? "general",
+        category: "general",
+        tags: [],
         status: "active",
         duplicateAnnotated: false,
         createdAt: nowIso(),
         updatedAt: nowIso(),
       };
-      await repo.upsertIdea(idea);
-      created.push(idea);
+      await repo.upsertIdea(fallback);
+      created.push(fallback);
     }
 
     return {

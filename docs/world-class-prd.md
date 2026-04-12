@@ -481,13 +481,13 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 
 ### 16.5 Idea generation and ranking
 
-- [ ] Remove heuristic randomness from idea generation.
-- [ ] Replace the current simplistic idea generation path with evidence-backed generation inputs.
-- [ ] Build a deterministic scoring model for impact, feasibility, confidence, and strategic alignment.
+- [x] Remove heuristic randomness from idea generation.
+- [x] Replace the current simplistic idea generation path with evidence-backed generation inputs.
+- [~] Build a deterministic scoring model for impact, feasibility, confidence, and strategic alignment.
 - [ ] Add explicit ranking explanations for every suggested idea.
 - [ ] Improve duplicate detection beyond simple overlap heuristics.
 - [ ] Add similarity fixtures and regression tests for duplicate handling.
-- [ ] Add scoring calibration fixtures so ranking behavior remains stable over time.
+- [~] Add scoring calibration fixtures so ranking behavior remains stable over time.
 
 ### 16.6 Preference learning and feedback loops
 

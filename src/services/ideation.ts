@@ -1,0 +1,134 @@
+import type { Idea, PreferenceProfile, ResearchFinding } from "../types.js";
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function categoryBaseImpact(category?: ResearchFinding["category"]): number {
+  switch (category) {
+    case "opportunity":
+      return 76;
+    case "user_feedback":
+      return 72;
+    case "competitive":
+      return 68;
+    case "technical":
+      return 61;
+    case "risk":
+      return 58;
+    case "threat":
+      return 55;
+    default:
+      return 60;
+  }
+}
+
+function categoryBaseFeasibility(category?: ResearchFinding["category"]): number {
+  switch (category) {
+    case "technical":
+      return 74;
+    case "risk":
+      return 66;
+    case "opportunity":
+      return 64;
+    case "user_feedback":
+      return 62;
+    case "competitive":
+      return 58;
+    case "threat":
+      return 52;
+    default:
+      return 60;
+  }
+}
+
+function computePreferenceBoost(
+  profile: PreferenceProfile | null | undefined,
+  category?: string,
+): number {
+  if (!profile || !category) return 0;
+  const stats = profile.categoryPreferences[category];
+  if (!stats) return 0;
+  const positive = stats.yes + stats.now;
+  const negative = stats.pass;
+  const total = positive + negative + stats.maybe;
+  if (total === 0) return 0;
+  return ((positive - negative) / total) * 10;
+}
+
+function normalizeTitle(title: string): string {
+  return title
+    .replace(/^(improve|fix|investigate|research|address):?\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function scoreFindingForIdea(
+  finding: ResearchFinding,
+  profile?: PreferenceProfile | null,
+): {
+  impactScore: number;
+  feasibilityScore: number;
+  rankingScore: number;
+} {
+  const confidenceBoost = (finding.confidence - 0.5) * 24;
+  const preferenceBoost = computePreferenceBoost(profile, finding.category);
+
+  const impactScore = clampScore(categoryBaseImpact(finding.category) + confidenceBoost + preferenceBoost);
+  const feasibilityScore = clampScore(categoryBaseFeasibility(finding.category) + confidenceBoost / 2 + preferenceBoost / 2);
+  const rankingScore = clampScore(impactScore * 0.65 + feasibilityScore * 0.35);
+
+  return { impactScore, feasibilityScore, rankingScore };
+}
+
+export function rankFindingsForIdeation(
+  findings: ResearchFinding[],
+  profile?: PreferenceProfile | null,
+): Array<ResearchFinding & { rankingScore: number; impactScore: number; feasibilityScore: number }> {
+  return findings
+    .map((finding) => ({
+      ...finding,
+      ...scoreFindingForIdea(finding, profile),
+    }))
+    .sort((a, b) =>
+      b.rankingScore - a.rankingScore ||
+      b.confidence - a.confidence ||
+      a.title.localeCompare(b.title),
+    );
+}
+
+export function buildIdeaDraftFromFinding(input: {
+  finding: ResearchFinding;
+  companyId: string;
+  projectId: string;
+  ideaId: string;
+  createdAt: string;
+  profile?: PreferenceProfile | null;
+}): Idea {
+  const scored = scoreFindingForIdea(input.finding, input.profile);
+  const normalizedTitle = normalizeTitle(input.finding.title);
+  const sourceLabel = input.finding.sourceLabel ?? input.finding.sourceUrl ?? "research";
+
+  return {
+    ideaId: input.ideaId,
+    companyId: input.companyId,
+    projectId: input.projectId,
+    cycleId: input.finding.cycleId,
+    title: normalizedTitle ? `Improve ${normalizedTitle}` : "Improve product experience",
+    description: input.finding.description || "Generated from research insights",
+    rationale: `Evidence-backed from ${sourceLabel} with confidence ${input.finding.confidence.toFixed(2)}`,
+    sourceReferences: input.finding.sourceUrl ? [input.finding.sourceUrl] : [],
+    impactScore: scored.impactScore,
+    feasibilityScore: scored.feasibilityScore,
+    complexityEstimate:
+      scored.feasibilityScore >= 72 ? "low" :
+      scored.feasibilityScore >= 58 ? "medium" : "high",
+    technicalApproach: input.finding.evidenceText,
+    category: input.finding.category ?? "general",
+    tags: input.finding.category ? [input.finding.category] : [],
+    status: "active",
+    duplicateAnnotated: false,
+    createdAt: input.createdAt,
+    updatedAt: input.createdAt,
+  };
+}
