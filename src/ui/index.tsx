@@ -313,6 +313,21 @@ function IdeasCard(props: { companyId: string; projectId: string }) {
                 <StatusPill status={idea.status} />
               </div>
               <div style={MUTED}>{idea.description || idea.rationale || "No description provided."}</div>
+              {idea.rationale ? (
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                  Why: {idea.rationale}
+                </div>
+              ) : null}
+              {idea.duplicateAnnotated ? (
+                <div style={{ fontSize: 12, color: "#b45309", marginTop: 6 }}>
+                  Marked as potential duplicate
+                </div>
+              ) : null}
+              {idea.sourceReferences?.length ? (
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                  Source: {idea.sourceReferences[0]}
+                </div>
+              ) : null}
               <div style={{ ...MUTED, marginTop: 6 }}>
                 Impact {idea.impactScore} | Feasibility {idea.feasibilityScore} | Complexity {idea.complexityEstimate ?? "n/a"}
               </div>

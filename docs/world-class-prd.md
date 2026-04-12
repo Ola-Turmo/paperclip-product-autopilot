@@ -526,7 +526,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [ ] Emit metrics for research, idea ranking, planning, delivery, rollbacks, and operator interventions.
 - [ ] Add duration and latency metrics, not just counters.
 - [ ] Add structured failure categories.
-- [ ] Build a replay harness for decision evaluation.
+- [~] Build a replay harness for decision evaluation.
 - [ ] Add benchmark fixtures for ranking quality, safety behavior, and digest behavior.
 - [ ] Add a simple scorecard that can answer whether the system is getting better.
 
