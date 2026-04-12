@@ -134,6 +134,19 @@ export const deliveryRunSchema = z.object({
   error: z.string().optional(),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
+}).superRefine((run, ctx) => {
+  if (run.status === "paused" && !run.paused) {
+    ctx.addIssue({ code: "custom", message: "paused runs must set paused=true", path: ["paused"] });
+  }
+  if (run.status !== "paused" && run.paused) {
+    ctx.addIssue({ code: "custom", message: "only paused runs may set paused=true", path: ["status"] });
+  }
+  if (["completed", "failed", "cancelled"].includes(run.status) && run.completedAt === null) {
+    ctx.addIssue({ code: "custom", message: "terminal runs must include completedAt", path: ["completedAt"] });
+  }
+  if (!["completed", "failed", "cancelled"].includes(run.status) && run.completedAt !== null) {
+    ctx.addIssue({ code: "custom", message: "non-terminal runs cannot include completedAt", path: ["completedAt"] });
+  }
 });
 
 export const companyBudgetSchema = z.object({
@@ -182,6 +195,21 @@ export const digestSchema = z.object({
   relatedRunId: z.string().optional(),
   relatedBudgetId: z.string().optional(),
   createdAt: z.string().min(1),
+}).superRefine((digest, ctx) => {
+  if (digest.status === "pending") {
+    if (digest.deliveredAt || digest.readAt || digest.dismissedAt) {
+      ctx.addIssue({ code: "custom", message: "pending digests cannot have lifecycle timestamps", path: ["status"] });
+    }
+  }
+  if (digest.status === "delivered" && !digest.deliveredAt) {
+    ctx.addIssue({ code: "custom", message: "delivered digests must include deliveredAt", path: ["deliveredAt"] });
+  }
+  if (digest.status === "read" && !digest.readAt) {
+    ctx.addIssue({ code: "custom", message: "read digests must include readAt", path: ["readAt"] });
+  }
+  if (digest.status === "dismissed" && !digest.dismissedAt) {
+    ctx.addIssue({ code: "custom", message: "dismissed digests must include dismissedAt", path: ["dismissedAt"] });
+  }
 });
 
 export const releaseHealthCheckSchema = z.object({
@@ -196,6 +224,16 @@ export const releaseHealthCheckSchema = z.object({
   failedAt: z.string().optional(),
   passedAt: z.string().optional(),
   createdAt: z.string().min(1),
+}).superRefine((check, ctx) => {
+  if (check.status === "passed" && !check.passedAt) {
+    ctx.addIssue({ code: "custom", message: "passed checks must include passedAt", path: ["passedAt"] });
+  }
+  if (check.status === "failed" && !check.failedAt) {
+    ctx.addIssue({ code: "custom", message: "failed checks must include failedAt", path: ["failedAt"] });
+  }
+  if (check.status !== "failed" && check.errorMessage) {
+    ctx.addIssue({ code: "custom", message: "only failed checks may include errorMessage", path: ["errorMessage"] });
+  }
 });
 
 export const rollbackActionSchema = z.object({
@@ -211,4 +249,17 @@ export const rollbackActionSchema = z.object({
   errorMessage: z.string().optional(),
   completedAt: z.string().optional(),
   createdAt: z.string().min(1),
+}).superRefine((rollback, ctx) => {
+  if (rollback.rollbackType === "restore_checkpoint" && !rollback.checkpointId) {
+    ctx.addIssue({ code: "custom", message: "restore_checkpoint requires checkpointId", path: ["checkpointId"] });
+  }
+  if (rollback.rollbackType === "revert_commit" && !rollback.targetCommitSha) {
+    ctx.addIssue({ code: "custom", message: "revert_commit requires targetCommitSha", path: ["targetCommitSha"] });
+  }
+  if (rollback.status === "completed" && !rollback.completedAt) {
+    ctx.addIssue({ code: "custom", message: "completed rollbacks must include completedAt", path: ["completedAt"] });
+  }
+  if (rollback.status === "pending" && rollback.completedAt) {
+    ctx.addIssue({ code: "custom", message: "pending rollbacks cannot include completedAt", path: ["completedAt"] });
+  }
 });

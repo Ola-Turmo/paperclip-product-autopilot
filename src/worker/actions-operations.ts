@@ -1,5 +1,6 @@
 import type { PluginContext } from "@paperclipai/plugin-sdk";
 import { ACTION_KEYS, type KnowledgeType } from "../constants.js";
+import type { DigestStatus } from "../constants.js";
 import type {
   Digest,
   KnowledgeEntry,
@@ -10,18 +11,18 @@ import {
   listStuckRuns,
   newId,
   nowIso,
-  upsertDigest,
-  upsertKnowledgeEntry,
-  upsertLearnerSummary,
-  upsertOperatorIntervention,
 } from "../helpers.js";
+import { createAutopilotRepository } from "../repositories/autopilot.js";
 import {
   createBudgetAlertDigest,
   createStuckRunDigest,
 } from "../services/orchestration.js";
+import { transitionDigest } from "../services/state-machines.js";
 import { requireCompanyAndProject } from "./action-utils.js";
 
 export function registerOperationsActionHandlers(ctx: PluginContext) {
+  const repo = createAutopilotRepository(ctx);
+
   ctx.actions.register(ACTION_KEYS.addOperatorNote, async (args) => {
     const a = args as { companyId: string; projectId: string; runId: string; note: string };
     const intervention: OperatorIntervention = {
@@ -33,7 +34,7 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       note: a.note,
       createdAt: nowIso(),
     };
-    await upsertOperatorIntervention(ctx, intervention);
+    await repo.upsertOperatorIntervention(intervention);
     return intervention;
   });
 
@@ -48,7 +49,7 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       note: a.reason,
       createdAt: nowIso(),
     };
-    await upsertOperatorIntervention(ctx, intervention);
+    await repo.upsertOperatorIntervention(intervention);
     return intervention;
   });
 
@@ -63,7 +64,7 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       note: a.note,
       createdAt: nowIso(),
     };
-    await upsertOperatorIntervention(ctx, intervention);
+    await repo.upsertOperatorIntervention(intervention);
     return intervention;
   });
 
@@ -92,7 +93,7 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       metrics: a.metrics ?? {},
       createdAt: nowIso(),
     };
-    await upsertLearnerSummary(ctx, summary);
+    await repo.upsertLearnerSummary(summary);
     return summary;
   });
 
@@ -123,7 +124,7 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       createdAt: nowIso(),
       updatedAt: nowIso(),
     };
-    await upsertKnowledgeEntry(ctx, entry);
+    await repo.upsertKnowledgeEntry(entry);
     return entry;
   });
 
@@ -156,8 +157,19 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       relatedBudgetId: a.relatedBudgetId,
       createdAt: nowIso(),
     };
-    await upsertDigest(ctx, digest);
+    await repo.upsertDigest(digest);
     return digest;
+  });
+
+  ctx.actions.register(ACTION_KEYS.dismissDigest, async (args) => {
+    const a = args as { companyId: string; projectId: string; digestId: string; status?: DigestStatus };
+    const digests = await repo.listDigests(a.companyId, a.projectId);
+    const digest = digests.find((candidate) => candidate.digestId === a.digestId);
+    if (!digest) throw new Error("Digest not found");
+    const nextStatus = a.status ?? "dismissed";
+    const updated = transitionDigest(digest, nextStatus, nowIso());
+    await repo.upsertDigest(updated);
+    return updated;
   });
 
   ctx.actions.register(ACTION_KEYS.generateStuckRunDigest, async (args) => {

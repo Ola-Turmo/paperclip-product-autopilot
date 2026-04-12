@@ -161,8 +161,76 @@ describe("runtime schemas", () => {
         checkId: "check-1",
         rollbackType: "restore_checkpoint",
         status: "pending",
+        checkpointId: "checkpoint-1",
         createdAt: "2026-01-01T00:00:00.000Z",
       }).rollbackType,
     ).toBe("restore_checkpoint");
+  });
+
+  it("rejects contradictory runtime invariant payloads", () => {
+    expect(() =>
+      deliveryRunSchema.parse({
+        runId: "run-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        ideaId: "idea-1",
+        artifactId: "artifact-1",
+        title: "Improve onboarding copy",
+        status: "paused",
+        automationTier: "supervised",
+        branchName: "autopilot/project1/idea1",
+        workspacePath: "/tmp/project",
+        leasedPort: 3000,
+        commitSha: null,
+        paused: false,
+        completedAt: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ).toThrow();
+
+    expect(() =>
+      digestSchema.parse({
+        digestId: "digest-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        digestType: "stuck_run",
+        title: "Stuck",
+        summary: "Run stuck",
+        details: [],
+        priority: "high",
+        status: "dismissed",
+        deliveredAt: null,
+        readAt: null,
+        dismissedAt: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ).toThrow();
+
+    expect(() =>
+      releaseHealthCheckSchema.parse({
+        checkId: "check-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-1",
+        checkType: "smoke_test",
+        name: "Smoke",
+        status: "failed",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ).toThrow();
+
+    expect(() =>
+      rollbackActionSchema.parse({
+        rollbackId: "rollback-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-1",
+        checkId: "check-1",
+        rollbackType: "revert_commit",
+        status: "pending",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ).toThrow();
   });
 });

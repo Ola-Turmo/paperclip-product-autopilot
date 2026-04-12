@@ -365,4 +365,28 @@ describe("worker integration", () => {
       }),
     ).rejects.toThrow("failed health check");
   });
+
+  it("dismisses digests through the digest state machine", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertCompanyBudget(harness.ctx, createBudget());
+    await upsertDeliveryRun(harness.ctx, createRun());
+
+    await harness.runJob(JOB_KEYS.autopilotSweep);
+
+    const digests = await harness.ctx.entities.list({
+      entityType: ENTITY_TYPES.digest,
+      scopeKind: "project",
+      scopeId: "project-1",
+    });
+    const digestId = digests[0]?.data.digestId as string;
+
+    const dismissed = await harness.performAction<{ status: string; dismissedAt: string }>(ACTION_KEYS.dismissDigest, {
+      companyId: "company-1",
+      projectId: "project-1",
+      digestId,
+    });
+
+    expect(dismissed.status).toBe("dismissed");
+    expect(dismissed.dismissedAt).toBeTruthy();
+  });
 });

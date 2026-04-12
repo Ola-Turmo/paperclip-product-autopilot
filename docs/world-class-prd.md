@@ -453,12 +453,12 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 
 - [x] Formalize the idea lifecycle as an explicit state machine.
 - [x] Formalize the delivery-run lifecycle as an explicit state machine.
-- [ ] Formalize the digest lifecycle as an explicit state machine.
+- [x] Formalize the digest lifecycle as an explicit state machine.
 - [x] Formalize checkpoint and rollback lifecycles as explicit state machines.
 - [~] Prevent invalid transitions centrally instead of in scattered handlers.
 - [ ] Add invariant validation helpers for impossible or contradictory entity states.
 - [~] Add transition tests for every allowed and disallowed lifecycle step.
-- [ ] Add invariant checks into runtime validation paths where appropriate.
+- [~] Add invariant checks into runtime validation paths where appropriate.
 
 ### 16.3 Persistence and schemas
 

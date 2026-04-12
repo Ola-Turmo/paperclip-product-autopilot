@@ -19,6 +19,9 @@ import {
   upsertConvoyTask,
   upsertDeliveryRun,
   upsertDigest,
+  upsertKnowledgeEntry,
+  upsertLearnerSummary,
+  upsertOperatorIntervention,
   upsertPlanningArtifact,
   upsertPreferenceProfile,
   upsertProductLock,
@@ -37,6 +40,9 @@ import type {
   DeliveryRun,
   Digest,
   Idea,
+  KnowledgeEntry,
+  LearnerSummary,
+  OperatorIntervention,
   PlanningArtifact,
   PreferenceProfile,
   ProductLock,
@@ -70,6 +76,9 @@ export interface AutopilotRepository {
   getCompanyBudget(companyId: string): Promise<CompanyBudget | null>;
   listDigests(companyId: string, projectId: string): Promise<Digest[]>;
   upsertDigest(digest: Digest): Promise<void>;
+  upsertLearnerSummary(summary: LearnerSummary): Promise<void>;
+  upsertKnowledgeEntry(entry: KnowledgeEntry): Promise<void>;
+  upsertOperatorIntervention(intervention: OperatorIntervention): Promise<void>;
   listStuckRuns(companyId: string, projectId: string): Promise<DeliveryRun[]>;
   listCheckpoints(companyId: string, projectId: string, runId?: string): Promise<Checkpoint[]>;
   listConvoyTasks(companyId: string, projectId: string, runId?: string): Promise<ConvoyTask[]>;
@@ -124,6 +133,15 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
     listDigests: (companyId, projectId) => listDigests(ctx, companyId, projectId),
     upsertDigest: async (digest) => {
       await upsertDigest(ctx, digest);
+    },
+    upsertLearnerSummary: async (summary) => {
+      await upsertLearnerSummary(ctx, summary);
+    },
+    upsertKnowledgeEntry: async (entry) => {
+      await upsertKnowledgeEntry(ctx, entry);
+    },
+    upsertOperatorIntervention: async (intervention) => {
+      await upsertOperatorIntervention(ctx, intervention);
     },
     listStuckRuns: (companyId, projectId) => listStuckRuns(ctx, companyId, projectId),
     listCheckpoints: (companyId, projectId, runId) => listCheckpoints(ctx, companyId, projectId, runId),
