@@ -31,6 +31,18 @@ import type {
   HealthCheckStatus,
   RollbackStatus,
 } from "./constants.js";
+import {
+  autopilotProjectSchema,
+  checkpointSchema,
+  companyBudgetSchema,
+  deliveryRunSchema,
+  digestSchema,
+  ideaSchema,
+  preferenceProfileSchema,
+  releaseHealthCheckSchema,
+  rollbackActionSchema,
+  researchCycleSchema,
+} from "./schemas.js";
 
 // ─── Time helpers ─────────────────────────────────────────────────────────────
 export function nowIso(): string {
@@ -105,19 +117,24 @@ export function asRollbackAction(r: PluginEntityRecord): RollbackAction {
   return r.data as unknown as RollbackAction;
 }
 
+function validateEntity<T>(schema: { parse: (value: unknown) => T }, value: T): T {
+  return schema.parse(value);
+}
+
 // ─── AutopilotProject helpers ─────────────────────────────────────────────────
 export async function upsertAutopilotProject(
   ctx: PluginContext,
   ap: AutopilotProject
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(autopilotProjectSchema, ap);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.autopilotProject,
     scopeKind: "project",
-    scopeId: ap.projectId,
-    externalId: ap.autopilotId,
-    title: `Autopilot for project ${ap.projectId.slice(0, 8)}`,
-    status: ap.enabled ? "active" : "inactive",
-    data: ap as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.autopilotId,
+    title: `Autopilot for project ${validated.projectId.slice(0, 8)}`,
+    status: validated.enabled ? "active" : "inactive",
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -228,14 +245,15 @@ export async function upsertResearchCycle(
   ctx: PluginContext,
   cycle: ResearchCycle
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(researchCycleSchema, cycle);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.researchCycle,
     scopeKind: "project",
-    scopeId: cycle.projectId,
-    externalId: cycle.cycleId,
-    title: `Research ${cycle.cycleId.slice(0, 8)}`,
-    status: cycle.status === "completed" ? "active" : "inactive",
-    data: cycle as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.cycleId,
+    title: `Research ${validated.cycleId.slice(0, 8)}`,
+    status: validated.status === "completed" ? "active" : "inactive",
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -301,14 +319,15 @@ export async function upsertIdea(
   ctx: PluginContext,
   idea: Idea
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(ideaSchema, idea);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.idea,
     scopeKind: "project",
-    scopeId: idea.projectId,
-    externalId: idea.ideaId,
-    title: idea.title.slice(0, 80),
-    status: ideaStatusToEntityStatus(idea.status),
-    data: idea as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.ideaId,
+    title: validated.title.slice(0, 80),
+    status: ideaStatusToEntityStatus(validated.status),
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -454,14 +473,15 @@ export async function upsertPreferenceProfile(
   ctx: PluginContext,
   profile: PreferenceProfile
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(preferenceProfileSchema, profile);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.preferenceProfile,
     scopeKind: "project",
-    scopeId: profile.projectId,
-    externalId: profile.profileId,
-    title: `Preferences for ${profile.projectId.slice(0, 8)}`,
+    scopeId: validated.projectId,
+    externalId: validated.profileId,
+    title: `Preferences for ${validated.projectId.slice(0, 8)}`,
     status: "active",
-    data: profile as unknown as Record<string, unknown>,
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -546,14 +566,15 @@ export async function upsertDeliveryRun(
   ctx: PluginContext,
   run: DeliveryRun
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(deliveryRunSchema, run);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.deliveryRun,
     scopeKind: "project",
-    scopeId: run.projectId,
-    externalId: run.runId,
-    title: run.title.slice(0, 80),
-    status: runStatusToEntityStatus(run.status),
-    data: run as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.runId,
+    title: validated.title.slice(0, 80),
+    status: runStatusToEntityStatus(validated.status),
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -657,14 +678,15 @@ export async function upsertCompanyBudget(
   ctx: PluginContext,
   budget: CompanyBudget
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(companyBudgetSchema, budget);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.companyBudget,
     scopeKind: "company",
-    scopeId: budget.companyId,
-    externalId: budget.budgetId,
-    title: `Budget for ${budget.companyId.slice(0, 8)}`,
-    status: budget.paused ? "inactive" : "active",
-    data: budget as unknown as Record<string, unknown>,
+    scopeId: validated.companyId,
+    externalId: validated.budgetId,
+    title: `Budget for ${validated.companyId.slice(0, 8)}`,
+    status: validated.paused ? "inactive" : "active",
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -731,14 +753,15 @@ export async function upsertCheckpoint(
   ctx: PluginContext,
   checkpoint: Checkpoint
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(checkpointSchema, checkpoint);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.checkpoint,
     scopeKind: "project",
-    scopeId: checkpoint.projectId,
-    externalId: checkpoint.checkpointId,
-    title: checkpoint.label ?? `Checkpoint ${checkpoint.checkpointId.slice(0, 8)}`,
+    scopeId: validated.projectId,
+    externalId: validated.checkpointId,
+    title: validated.label ?? `Checkpoint ${validated.checkpointId.slice(0, 8)}`,
     status: "active",
-    data: checkpoint as unknown as Record<string, unknown>,
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -924,14 +947,15 @@ export async function upsertDigest(
   ctx: PluginContext,
   digest: Digest
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(digestSchema, digest);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.digest,
     scopeKind: "project",
-    scopeId: digest.projectId,
-    externalId: digest.digestId,
-    title: digest.title.slice(0, 80),
-    status: digest.status,
-    data: digest as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.digestId,
+    title: validated.title.slice(0, 80),
+    status: validated.status,
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -960,14 +984,15 @@ export async function upsertReleaseHealthCheck(
   ctx: PluginContext,
   check: ReleaseHealthCheck
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(releaseHealthCheckSchema, check);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.releaseHealth,
     scopeKind: "project",
-    scopeId: check.projectId,
-    externalId: check.checkId,
-    title: check.name,
-    status: checkStatusToEntityStatus(check.status),
-    data: check as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.checkId,
+    title: validated.name,
+    status: checkStatusToEntityStatus(validated.status),
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -1002,14 +1027,15 @@ export async function upsertRollbackAction(
   ctx: PluginContext,
   action: RollbackAction
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(rollbackActionSchema, action);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.rollbackAction,
     scopeKind: "project",
-    scopeId: action.projectId,
-    externalId: action.rollbackId,
-    title: `Rollback ${action.rollbackType}`,
-    status: rollbackStatusToEntityStatus(action.status),
-    data: action as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.rollbackId,
+    title: `Rollback ${validated.rollbackType}`,
+    status: rollbackStatusToEntityStatus(validated.status),
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 

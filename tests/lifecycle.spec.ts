@@ -1,0 +1,104 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildCheckpoint,
+  buildReleaseHealthCheck,
+  buildRestoredConvoyTask,
+  buildRollbackAction,
+  checkpointSummary,
+  updateReleaseHealthCheck,
+} from "../src/services/lifecycle.js";
+import type { ConvoyTask, DeliveryRun } from "../src/types.js";
+
+function createRun(): DeliveryRun {
+  return {
+    runId: "run-1",
+    companyId: "company-1",
+    projectId: "project-1",
+    ideaId: "idea-1",
+    artifactId: "artifact-1",
+    title: "Delivery run",
+    status: "running",
+    automationTier: "semiauto",
+    branchName: "autopilot/project1/idea1",
+    workspacePath: "/tmp/project",
+    leasedPort: 3000,
+    commitSha: null,
+    paused: false,
+    completedAt: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+function createTask(): ConvoyTask {
+  return {
+    taskId: "task-1",
+    companyId: "company-1",
+    projectId: "project-1",
+    runId: "run-1",
+    artifactId: "artifact-1",
+    title: "Implement onboarding fix",
+    description: "desc",
+    status: "running",
+    dependsOnTaskIds: [],
+    startedAt: null,
+    completedAt: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+describe("lifecycle services", () => {
+  it("builds checkpoints and restores convoy tasks", () => {
+    const checkpoint = buildCheckpoint({
+      checkpointId: "checkpoint-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: "run-1",
+      run: createRun(),
+      tasks: [createTask()],
+      createdAt: "2026-01-02T00:00:00.000Z",
+      label: "Before risky change",
+    });
+    const restoredTask = buildRestoredConvoyTask(createTask(), "blocked", "2026-01-03T00:00:00.000Z");
+
+    expect(checkpoint.taskStates["task-1"]).toBe("running");
+    expect(checkpointSummary(checkpoint)).toBe("Before risky change");
+    expect(restoredTask.status).toBe("blocked");
+  });
+
+  it("builds and updates release health checks", () => {
+    const check = buildReleaseHealthCheck({
+      checkId: "check-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: "run-1",
+      checkType: "smoke_test",
+      name: "Smoke test",
+      createdAt: "2026-01-02T00:00:00.000Z",
+    });
+    const updated = updateReleaseHealthCheck(check, "failed", "2026-01-03T00:00:00.000Z", "boom");
+
+    expect(check.status).toBe("pending");
+    expect(updated.status).toBe("failed");
+    expect(updated.errorMessage).toBe("boom");
+    expect(updated.failedAt).toBe("2026-01-03T00:00:00.000Z");
+  });
+
+  it("builds rollback actions", () => {
+    const rollback = buildRollbackAction({
+      rollbackId: "rollback-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: "run-1",
+      checkId: "check-1",
+      rollbackType: "restore_checkpoint",
+      checkpointId: "checkpoint-1",
+      createdAt: "2026-01-03T00:00:00.000Z",
+    });
+
+    expect(rollback.status).toBe("pending");
+    expect(rollback.rollbackType).toBe("restore_checkpoint");
+    expect(rollback.checkpointId).toBe("checkpoint-1");
+  });
+});

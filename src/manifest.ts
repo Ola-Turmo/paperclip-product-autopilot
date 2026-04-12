@@ -14,7 +14,7 @@ const manifest: PaperclipPluginManifestV1 = {
   description:
     "Autonomous product-improvement loop: research, ideation, swipe review, preference learning, planning, and delivery pipeline with convoys, checkpoints, and product locks.",
   author: "Ola-Turmo",
-  categories: ["automation"],
+  categories: ["automation", "ui"],
   capabilities: [
     "companies.read",
     "projects.read",
@@ -22,13 +22,19 @@ const manifest: PaperclipPluginManifestV1 = {
     "plugin.state.read",
     "plugin.state.write",
     "activity.log.write",
+    "agent.tools.register",
+    "jobs.schedule",
+    "metrics.write",
+    "telemetry.track",
     "ui.page.register",
     "ui.detailTab.register",
     "ui.sidebar.register",
+    "ui.dashboardWidget.register",
+    "instance.settings.register",
   ],
   entrypoints: {
-    worker: "./dist/autopilot/worker.js",
-    ui: "./dist/autopilot/ui",
+    worker: "./dist/worker.js",
+    ui: "./dist/ui",
   },
   jobs: [
     {
@@ -155,6 +161,19 @@ const manifest: PaperclipPluginManifestV1 = {
         id: "autopilot-dashboard-widget",
         displayName: "Autopilot Overview",
         exportName: "AutopilotDashboardWidget",
+      },
+      {
+        type: "settingsPage",
+        id: "company-autopilot-settings",
+        displayName: "Autopilot",
+        exportName: "AutopilotSettings",
+      },
+      {
+        type: "detailTab",
+        id: "autopilot-run-detail-tab",
+        displayName: "Autopilot",
+        exportName: "AutopilotRunDetailTab",
+        entityTypes: ["run"],
       },
     ],
   },
