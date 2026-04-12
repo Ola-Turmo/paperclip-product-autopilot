@@ -1035,6 +1035,27 @@ function rollbackStatusToEntityStatus(s: RollbackStatus): string {
   return "inactive";
 }
 
+export async function listRollbackActions(
+  ctx: PluginContext,
+  companyId: string,
+  projectId: string,
+  runId?: string
+): Promise<RollbackAction[]> {
+  const entities = await ctx.entities.list({
+    entityType: ENTITY_TYPES.rollbackAction,
+    scopeKind: "project",
+    scopeId: projectId,
+    limit: 200,
+  });
+  return entities
+    .filter(
+      (e) =>
+        asRollbackAction(e).companyId === companyId &&
+        (!runId || asRollbackAction(e).runId === runId)
+    )
+    .map(asRollbackAction);
+}
+
 // ─── UUID generator ─────────────────────────────────────────────────────────────
 export function newId(): string {
   return randomUUID();

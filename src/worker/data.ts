@@ -4,54 +4,41 @@ import type { IdeaStatus } from "../constants.js";
 import type { AutopilotProject } from "../types.js";
 import {
   getActiveWorkspaceLease,
-  getAutopilotProject,
-  getCompanyBudget,
-  getDeliveryRun,
-  getIdea,
   getLatestProductProgram,
   getPlanningArtifact,
-  getPreferenceProfile,
-  listAutopilotProjectEntities,
-  listCheckpoints,
   listDeliveryRuns,
-  listDigests,
-  listIdeas,
-  listKnowledgeEntries,
   listLearnerSummaries,
-  listMaybePoolIdeas,
-  listOperatorInterventions,
   listPlanningArtifacts,
   listProductLocks,
   listProductProgramRevisions,
-  listReleaseHealthChecks,
   listResearchCycles,
-  listResearchFindings,
   listSwipeEvents,
-  listConvoyTasks,
 } from "../helpers.js";
+import { createAutopilotRepository } from "../repositories/autopilot.js";
 import { buildAutopilotOverview } from "../services/overview.js";
 
 export function registerDataHandlers(ctx: PluginContext) {
+  const repo = createAutopilotRepository(ctx);
+
   ctx.data.register(DATA_KEYS.autopilotProject, async (args) => {
     const { companyId, projectId } = args as { companyId: string; projectId: string };
-    return (await getAutopilotProject(ctx, companyId, projectId)) ?? undefined;
+    return (await repo.getAutopilotProject(companyId, projectId)) ?? undefined;
   });
 
   ctx.data.register(DATA_KEYS.autopilotProjects, async (args) => {
     const { companyId } = args as { companyId?: string };
-    const entities = await listAutopilotProjectEntities(ctx, companyId);
-    return entities.map((entity) => entity.data) as unknown as AutopilotProject[];
+    return await repo.listAutopilotProjects(companyId) as unknown as AutopilotProject[];
   });
 
   ctx.data.register("autopilot-overview", async (args) => {
     const { companyId, projectId } = args as { companyId: string; projectId: string };
     const [project, ideas, maybeIdeas, runs, swipes, budget] = await Promise.all([
-      getAutopilotProject(ctx, companyId, projectId),
-      listIdeas(ctx, companyId, projectId),
-      listMaybePoolIdeas(ctx, companyId, projectId),
+      repo.getAutopilotProject(companyId, projectId),
+      repo.listIdeas(companyId, projectId),
+      repo.listMaybePoolIdeas(companyId, projectId),
       listDeliveryRuns(ctx, companyId, projectId),
       listSwipeEvents(ctx, companyId, projectId, 50),
-      getCompanyBudget(ctx, companyId),
+      repo.getCompanyBudget(companyId),
     ]);
     return buildAutopilotOverview({ project, ideas, maybeIdeas, runs, swipes, budget });
   });
@@ -79,22 +66,22 @@ export function registerDataHandlers(ctx: PluginContext) {
 
   ctx.data.register(DATA_KEYS.researchFindings, async (args) => {
     const { companyId, projectId, cycleId } = args as { companyId: string; projectId: string; cycleId?: string };
-    return await listResearchFindings(ctx, companyId, projectId, cycleId);
+    return await repo.listResearchFindings(companyId, projectId, cycleId);
   });
 
   ctx.data.register(DATA_KEYS.idea, async (args) => {
     const { companyId, projectId, ideaId } = args as { companyId: string; projectId: string; ideaId: string };
-    return (await getIdea(ctx, companyId, projectId, ideaId)) ?? undefined;
+    return (await repo.getIdea(companyId, projectId, ideaId)) ?? undefined;
   });
 
   ctx.data.register(DATA_KEYS.ideas, async (args) => {
     const { companyId, projectId, status } = args as { companyId: string; projectId: string; status?: IdeaStatus };
-    return await listIdeas(ctx, companyId, projectId, status);
+    return await repo.listIdeas(companyId, projectId, status);
   });
 
   ctx.data.register(DATA_KEYS.maybePoolIdeas, async (args) => {
     const { companyId, projectId } = args as { companyId: string; projectId: string };
-    return await listMaybePoolIdeas(ctx, companyId, projectId);
+    return await repo.listMaybePoolIdeas(companyId, projectId);
   });
 
   ctx.data.register(DATA_KEYS.swipeEvent, async (args) => {
@@ -110,7 +97,7 @@ export function registerDataHandlers(ctx: PluginContext) {
 
   ctx.data.register(DATA_KEYS.preferenceProfile, async (args) => {
     const { companyId, projectId } = args as { companyId: string; projectId: string };
-    return (await getPreferenceProfile(ctx, companyId, projectId)) ?? undefined;
+    return (await repo.getPreferenceProfile(companyId, projectId)) ?? undefined;
   });
 
   ctx.data.register(DATA_KEYS.planningArtifact, async (args) => {
@@ -125,7 +112,7 @@ export function registerDataHandlers(ctx: PluginContext) {
 
   ctx.data.register(DATA_KEYS.deliveryRun, async (args) => {
     const { companyId, projectId, runId } = args as { companyId: string; projectId: string; runId: string };
-    return (await getDeliveryRun(ctx, companyId, projectId, runId)) ?? undefined;
+    return (await repo.getDeliveryRun(companyId, projectId, runId)) ?? undefined;
   });
 
   ctx.data.register(DATA_KEYS.deliveryRuns, async (args) => {
@@ -140,17 +127,17 @@ export function registerDataHandlers(ctx: PluginContext) {
 
   ctx.data.register(DATA_KEYS.companyBudget, async (args) => {
     const { companyId } = args as { companyId: string };
-    return (await getCompanyBudget(ctx, companyId)) ?? undefined;
+    return (await repo.getCompanyBudget(companyId)) ?? undefined;
   });
 
   ctx.data.register(DATA_KEYS.convoyTasks, async (args) => {
     const { companyId, projectId, runId } = args as { companyId: string; projectId: string; runId?: string };
-    return await listConvoyTasks(ctx, companyId, projectId, runId);
+    return await repo.listConvoyTasks(companyId, projectId, runId);
   });
 
   ctx.data.register(DATA_KEYS.checkpoints, async (args) => {
     const { companyId, projectId, runId } = args as { companyId: string; projectId: string; runId?: string };
-    return await listCheckpoints(ctx, companyId, projectId, runId);
+    return await repo.listCheckpoints(companyId, projectId, runId);
   });
 
   ctx.data.register(DATA_KEYS.productLocks, async (args) => {
@@ -160,7 +147,7 @@ export function registerDataHandlers(ctx: PluginContext) {
 
   ctx.data.register(DATA_KEYS.operatorInterventions, async (args) => {
     const { companyId, projectId, runId } = args as { companyId: string; projectId: string; runId?: string };
-    return await listOperatorInterventions(ctx, companyId, projectId, runId);
+    return await repo.listOperatorInterventions(companyId, projectId, runId);
   });
 
   ctx.data.register(DATA_KEYS.learnerSummaries, async (args) => {
@@ -170,16 +157,21 @@ export function registerDataHandlers(ctx: PluginContext) {
 
   ctx.data.register(DATA_KEYS.knowledgeEntries, async (args) => {
     const { companyId, projectId } = args as { companyId: string; projectId: string };
-    return await listKnowledgeEntries(ctx, companyId, projectId);
+    return await repo.listKnowledgeEntries(companyId, projectId);
   });
 
   ctx.data.register(DATA_KEYS.digests, async (args) => {
     const { companyId, projectId } = args as { companyId: string; projectId?: string };
-    return await listDigests(ctx, companyId, projectId);
+    return projectId ? await repo.listDigests(companyId, projectId) : [];
   });
 
   ctx.data.register(DATA_KEYS.releaseHealthChecks, async (args) => {
     const { companyId, projectId, runId } = args as { companyId: string; projectId: string; runId?: string };
-    return await listReleaseHealthChecks(ctx, companyId, projectId, runId);
+    return await repo.listReleaseHealthChecks(companyId, projectId, runId);
+  });
+
+  ctx.data.register(DATA_KEYS.rollbackActions, async (args) => {
+    const { companyId, projectId, runId } = args as { companyId: string; projectId: string; runId?: string };
+    return await repo.listRollbackActions(companyId, projectId, runId);
   });
 }

@@ -11,7 +11,10 @@ import {
   listDigests,
   listIdeas,
   listMaybePoolIdeas,
+  listKnowledgeEntries,
+  listOperatorInterventions,
   listReleaseHealthChecks,
+  listRollbackActions,
   listResearchFindings,
   listStuckRuns,
   upsertAutopilotProject,
@@ -79,10 +82,13 @@ export interface AutopilotRepository {
   upsertLearnerSummary(summary: LearnerSummary): Promise<void>;
   upsertKnowledgeEntry(entry: KnowledgeEntry): Promise<void>;
   upsertOperatorIntervention(intervention: OperatorIntervention): Promise<void>;
+  listKnowledgeEntries(companyId: string, projectId: string): Promise<KnowledgeEntry[]>;
+  listOperatorInterventions(companyId: string, projectId: string, runId?: string): Promise<OperatorIntervention[]>;
   listStuckRuns(companyId: string, projectId: string): Promise<DeliveryRun[]>;
   listCheckpoints(companyId: string, projectId: string, runId?: string): Promise<Checkpoint[]>;
   listConvoyTasks(companyId: string, projectId: string, runId?: string): Promise<ConvoyTask[]>;
   listReleaseHealthChecks(companyId: string, projectId: string, runId?: string): Promise<ReleaseHealthCheck[]>;
+  listRollbackActions(companyId: string, projectId: string, runId?: string): Promise<RollbackAction[]>;
   upsertCheckpoint(checkpoint: Checkpoint): Promise<void>;
   upsertConvoyTask(task: ConvoyTask): Promise<void>;
   upsertReleaseHealthCheck(check: ReleaseHealthCheck): Promise<void>;
@@ -143,10 +149,13 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
     upsertOperatorIntervention: async (intervention) => {
       await upsertOperatorIntervention(ctx, intervention);
     },
+    listKnowledgeEntries: (companyId, projectId) => listKnowledgeEntries(ctx, companyId, projectId),
+    listOperatorInterventions: (companyId, projectId, runId) => listOperatorInterventions(ctx, companyId, projectId, runId),
     listStuckRuns: (companyId, projectId) => listStuckRuns(ctx, companyId, projectId),
     listCheckpoints: (companyId, projectId, runId) => listCheckpoints(ctx, companyId, projectId, runId),
     listConvoyTasks: (companyId, projectId, runId) => listConvoyTasks(ctx, companyId, projectId, runId),
     listReleaseHealthChecks: (companyId, projectId, runId) => listReleaseHealthChecks(ctx, companyId, projectId, runId),
+    listRollbackActions: (companyId, projectId, runId) => listRollbackActions(ctx, companyId, projectId, runId),
     upsertCheckpoint: async (checkpoint) => {
       await upsertCheckpoint(ctx, checkpoint);
     },

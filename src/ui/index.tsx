@@ -13,11 +13,13 @@ import type { AutomationTier } from "../constants.js";
 import type {
   AutopilotOverview,
   AutopilotProject,
+  Checkpoint,
   DeliveryRun,
+  Digest,
   Idea,
   OperatorIntervention,
   ReleaseHealthCheck,
-  Digest,
+  RollbackAction,
   ResearchCycle,
 } from "../types.js";
 import { getIdeationBenchmarkSummary } from "../services/evaluation-fixtures.js";
@@ -473,6 +475,91 @@ function EvaluationCard() {
   );
 }
 
+type TimelineEvent = {
+  id: string;
+  at: string;
+  title: string;
+  detail: string;
+  status: string;
+};
+
+function AuditTimeline(props: {
+  run: DeliveryRun;
+  checks: ReleaseHealthCheck[];
+  interventions: OperatorIntervention[];
+  checkpoints: Checkpoint[];
+  rollbacks: RollbackAction[];
+  digests: Digest[];
+}) {
+  const events: TimelineEvent[] = [
+    {
+      id: `run-created-${props.run.runId}`,
+      at: props.run.createdAt,
+      title: "Run created",
+      detail: props.run.title,
+      status: props.run.status,
+    },
+    ...props.checkpoints.map((checkpoint) => ({
+      id: checkpoint.checkpointId,
+      at: checkpoint.createdAt,
+      title: "Checkpoint created",
+      detail: checkpoint.label ?? checkpoint.checkpointId,
+      status: "paused",
+    })),
+    ...props.checks.map((check) => ({
+      id: check.checkId,
+      at: check.failedAt ?? check.passedAt ?? check.createdAt,
+      title: `Health check: ${check.name}`,
+      detail: check.errorMessage ?? check.checkType,
+      status: check.status,
+    })),
+    ...props.rollbacks.map((rollback) => ({
+      id: rollback.rollbackId,
+      at: rollback.completedAt ?? rollback.createdAt,
+      title: `Rollback: ${rollback.rollbackType}`,
+      detail: rollback.errorMessage ?? rollback.status,
+      status: rollback.status,
+    })),
+    ...props.interventions.map((intervention) => ({
+      id: intervention.interventionId,
+      at: intervention.createdAt,
+      title: `Operator ${intervention.interventionType.replace(/_/g, " ")}`,
+      detail: intervention.note ?? "No note",
+      status: "active",
+    })),
+    ...props.digests.map((digest) => ({
+      id: digest.digestId,
+      at: digest.dismissedAt ?? digest.readAt ?? digest.deliveredAt ?? digest.createdAt,
+      title: `Digest: ${digest.digestType}`,
+      detail: digest.summary,
+      status: digest.status,
+    })),
+  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+  return (
+    <Section title="Audit Timeline">
+      {events.length === 0 ? (
+        <div style={MUTED}>No audit events yet.</div>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {events.map((event) => (
+            <div key={event.id} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ fontWeight: 700, color: "#0f172a" }}>{event.title}</div>
+                <StatusPill status={event.status} />
+              </div>
+              <div style={{ ...MUTED, marginTop: 6 }}>{event.detail}</div>
+              <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                {new Date(event.at).toLocaleString()}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 export function AutopilotProjectTab({ context }: PluginDetailTabProps) {
   const companyId = context.companyId;
   const projectId = context.entityId;
@@ -619,7 +706,17 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
     projectId: context.projectId ?? "",
     runId: context.entityId,
   });
+  const { data: checkpoints } = usePluginData<Checkpoint[]>(DATA_KEYS.checkpoints, {
+    companyId: context.companyId,
+    projectId: context.projectId ?? "",
+    runId: context.entityId,
+  });
   const { data: checks } = usePluginData<ReleaseHealthCheck[]>(DATA_KEYS.releaseHealthChecks, {
+    companyId: context.companyId,
+    projectId: context.projectId ?? "",
+    runId: context.entityId,
+  });
+  const { data: rollbacks } = usePluginData<RollbackAction[]>(DATA_KEYS.rollbackActions, {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
     runId: context.entityId,
@@ -628,6 +725,10 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
     runId: context.entityId,
+  });
+  const { data: digests } = usePluginData<Digest[]>(DATA_KEYS.digests, {
+    companyId: context.companyId,
+    projectId: context.projectId ?? "",
   });
 
   if (!run) {
@@ -682,6 +783,14 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
           </div>
         )}
       </Section>
+      <AuditTimeline
+        run={run}
+        checks={checks ?? []}
+        interventions={interventions ?? []}
+        checkpoints={checkpoints ?? []}
+        rollbacks={rollbacks ?? []}
+        digests={(digests ?? []).filter((digest) => digest.relatedRunId === run.runId)}
+      />
     </div>
   );
 }
