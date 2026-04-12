@@ -533,9 +533,11 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 ### 16.10 UI and operator experience
 
 - [x] Replace broken UI wiring with a working SDK-aligned UI.
-- [ ] Turn the UI from a stabilization surface into a true operator console.
+- [~] Turn the UI from a stabilization surface into a true operator console.
 - [ ] Add a run audit timeline.
 - [~] Add evidence drill-down for ideas and research findings.
+- [~] Add budget and digest management surfaces.
+- [~] Add run-detail and health-check UX that exposes decision context, not just raw records.
 - [ ] Add clearer intervention workflows for pause, resume, checkpoint, rollback, and note-taking.
 - [ ] Add budget and digest management surfaces.
 - [ ] Add better empty states, loading states, and error states.

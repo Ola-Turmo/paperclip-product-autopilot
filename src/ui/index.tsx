@@ -15,6 +15,9 @@ import type {
   AutopilotProject,
   DeliveryRun,
   Idea,
+  OperatorIntervention,
+  ReleaseHealthCheck,
+  Digest,
   ResearchCycle,
 } from "../types.js";
 import { getIdeationBenchmarkSummary } from "../services/evaluation-fixtures.js";
@@ -369,6 +372,65 @@ function RunsCard(props: { companyId: string; projectId: string }) {
   );
 }
 
+function DigestsCard(props: { companyId: string; projectId: string; onRefresh: () => void }) {
+  const dismissDigest = usePluginAction(ACTION_KEYS.dismissDigest);
+  const toast = usePluginToast();
+  const { data: digests, refresh } = usePluginData<Digest[]>(DATA_KEYS.digests, {
+    companyId: props.companyId,
+    projectId: props.projectId,
+  });
+
+  async function handleDismiss(digestId: string) {
+    try {
+      await dismissDigest({
+        companyId: props.companyId,
+        projectId: props.projectId,
+        digestId,
+      });
+      toast({ title: "Digest dismissed", tone: "success" });
+      refresh();
+      props.onRefresh();
+    } catch (error) {
+      toastError(toast, "Failed to dismiss digest", error);
+    }
+  }
+
+  return (
+    <Section title="Digest Inbox">
+      {!digests || digests.length === 0 ? (
+        <div style={MUTED}>No digests yet.</div>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {digests.slice(0, 8).map((digest) => (
+            <div key={digest.digestId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
+                <div style={{ fontWeight: 700, color: "#0f172a" }}>{digest.title}</div>
+                <StatusPill status={digest.status} />
+              </div>
+              <div style={MUTED}>{digest.summary}</div>
+              <div style={{ ...MUTED, marginTop: 6 }}>
+                Type {digest.digestType} | Priority {digest.priority}
+              </div>
+              {digest.details.length ? (
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                  {digest.details[0]}
+                </div>
+              ) : null}
+              {digest.status !== "dismissed" ? (
+                <div style={{ marginTop: 10 }}>
+                  <button onClick={() => handleDismiss(digest.digestId)} style={BUTTON_SECONDARY}>
+                    Dismiss
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 function EvaluationCard() {
   const summary = getIdeationBenchmarkSummary();
 
@@ -438,6 +500,7 @@ export function AutopilotProjectTab({ context }: PluginDetailTabProps) {
       <ProjectSettingsCard companyId={companyId} projectId={projectId} project={project} onSaved={refreshAll} />
       <ResearchCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
       <EvaluationCard />
+      <DigestsCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
       <IdeasCard companyId={companyId} projectId={projectId} />
       <RunsCard companyId={companyId} projectId={projectId} />
     </div>
@@ -556,6 +619,16 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
     projectId: context.projectId ?? "",
     runId: context.entityId,
   });
+  const { data: checks } = usePluginData<ReleaseHealthCheck[]>(DATA_KEYS.releaseHealthChecks, {
+    companyId: context.companyId,
+    projectId: context.projectId ?? "",
+    runId: context.entityId,
+  });
+  const { data: interventions } = usePluginData<OperatorIntervention[]>(DATA_KEYS.operatorInterventions, {
+    companyId: context.companyId,
+    projectId: context.projectId ?? "",
+    runId: context.entityId,
+  });
 
   if (!run) {
     return <div style={PAGE}>Loading run details...</div>;
@@ -573,6 +646,41 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
           {run.pauseReason ? <div style={MUTED}>Pause reason: {run.pauseReason}</div> : null}
           {run.error ? <div style={{ color: "#dc2626", fontSize: 13 }}>{run.error}</div> : null}
         </div>
+      </Section>
+      <Section title="Release Health">
+        {!checks || checks.length === 0 ? (
+          <div style={MUTED}>No release health checks yet.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {checks.map((check) => (
+              <div key={check.checkId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ fontWeight: 700, color: "#0f172a" }}>{check.name}</div>
+                  <StatusPill status={check.status} />
+                </div>
+                <div style={{ ...MUTED, marginTop: 6 }}>Type: {check.checkType}</div>
+                {check.errorMessage ? <div style={{ color: "#dc2626", fontSize: 13, marginTop: 6 }}>{check.errorMessage}</div> : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+      <Section title="Operator Interventions">
+        {!interventions || interventions.length === 0 ? (
+          <div style={MUTED}>No operator interventions recorded for this run.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {interventions.map((intervention) => (
+              <div key={intervention.interventionId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ fontWeight: 700, color: "#0f172a" }}>{intervention.interventionType.replace(/_/g, " ")}</div>
+                  <div style={MUTED}>{new Date(intervention.createdAt).toLocaleString()}</div>
+                </div>
+                {intervention.note ? <div style={{ ...MUTED, marginTop: 6 }}>{intervention.note}</div> : null}
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
     </div>
   );
