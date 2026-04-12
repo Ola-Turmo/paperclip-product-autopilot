@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   usePluginAction,
@@ -7,9 +8,6 @@ import {
   type PluginDetailTabProps,
   type PluginProjectSidebarItemProps,
   type PluginWidgetProps,
-  type PluginDashboardProps,
-  type PluginSettingsProps,
-  type PluginRunDetailTabProps,
 } from "@paperclipai/plugin-sdk/ui";
 import {
   ACTION_KEYS,
@@ -22,7 +20,7 @@ import {
   type InterventionType,
   type DigestType,
   type HealthCheckType,
-} from "../constants.js";
+} from "../../constants.js";
 import type {
   AutopilotProject,
   ResearchCycle,
@@ -42,7 +40,7 @@ import type {
   Digest,
   AutopilotOverview,
   ProductProgramRevision,
-} from "../types.js";
+} from "../../types.js";
 
 // ─── Shared styles ──────────────────────────────────────────────────────────────
 const PAGE: CSSProperties = { display: "grid", gap: 20, padding: 24 };
@@ -223,9 +221,9 @@ function ProjectSettingsForm({ project, companyId, projectId }: {
     setSaving(true);
     try {
       await saveProject({ companyId, projectId, automationTier: tier, budgetMinutes: budget, enabled, repoUrl: repoUrl || undefined });
-      toast({ message: "Autopilot settings saved", type: "success" });
+      toast({ title: "Autopilot settings saved", tone: "success" });
     } catch (e) {
-      toast({ message: `Save failed: ${e}`, type: "error" });
+      toast({ title: `Save failed: ${e}`, tone: "error" });
     } finally {
       setSaving(false);
     }
@@ -245,7 +243,7 @@ function ProjectSettingsForm({ project, companyId, projectId }: {
         </div>
         <div style={FLEX}>
           <label style={{ fontSize: 13, fontWeight: 600, color: "#475569", minWidth: 120 }}>Automation Tier</label>
-          <select value={tier} onChange={(e) => setTier(e.target.value as AutomationTier)} style={{ ...INPUT, width: 180 }}>
+          <select value={tier} onChange={(e: any) => setTier(e.target.value as AutomationTier)} style={{ ...INPUT, width: 180 }}>
             <option value="supervised">Supervised</option>
             <option value="semiauto">Semiauto</option>
             <option value="fullauto">Full Auto</option>
@@ -253,11 +251,11 @@ function ProjectSettingsForm({ project, companyId, projectId }: {
         </div>
         <div style={FLEX}>
           <label style={{ fontSize: 13, fontWeight: 600, color: "#475569", minWidth: 120 }}>Budget (min/month)</label>
-          <input type="number" value={budget} onChange={(e) => setBudget(Number(e.target.value))} style={{ ...INPUT, width: 120 }} />
+          <input type="number" value={budget} onChange={(e: any) => setBudget(Number(e.target.value))} style={{ ...INPUT, width: 120 }} />
         </div>
         <div style={FLEX}>
           <label style={{ fontSize: 13, fontWeight: 600, color: "#475569", minWidth: 120 }}>Repo URL</label>
-          <input type="text" value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} style={{ ...INPUT, flex: 1 }} placeholder="https://github.com/..." />
+          <input type="text" value={repoUrl} onChange={(e: any) => setRepoUrl(e.target.value)} style={{ ...INPUT, flex: 1 }} placeholder="https://github.com/..." />
         </div>
         <div style={{ marginTop: 4 }}>
           <button onClick={handleSave} disabled={saving} style={saving ? { ...BTN_PRIMARY, opacity: 0.6 } : BTN_PRIMARY}>
@@ -292,9 +290,9 @@ function ResearchSection({ companyId, projectId }: { companyId: string; projectI
       await startCycle({ companyId, projectId, query: query.trim() });
       setQuery("");
       await refresh();
-      toast({ message: "Research cycle started", type: "success" });
+      toast({ title: "Research cycle started", tone: "success" });
     } catch (e) {
-      toast({ message: `Failed: ${e}`, type: "error" });
+      toast({ title: `Failed: ${e}`, tone: "error" });
     } finally {
       setRunning(false);
     }
@@ -305,9 +303,9 @@ function ResearchSection({ companyId, projectId }: { companyId: string; projectI
     try {
       await completeCycle({ companyId, projectId, cycleId: latestCycle.cycleId });
       await refresh();
-      toast({ message: "Research cycle completed", type: "success" });
+      toast({ title: "Research cycle completed", tone: "success" });
     } catch (e) {
-      toast({ message: `Failed: ${e}`, type: "error" });
+      toast({ title: `Failed: ${e}`, tone: "error" });
     }
   }, [completeCycle, companyId, projectId, latestCycle, refresh, toast]);
 
@@ -319,7 +317,7 @@ function ResearchSection({ companyId, projectId }: { companyId: string; projectI
       setFindingDesc("");
       await refresh();
     } catch (e) {
-      toast({ message: `Failed: ${e}`, type: "error" });
+      toast({ title: `Failed: ${e}`, tone: "error" });
     }
   }, [addFinding, companyId, projectId, latestCycle, findingTitle, findingDesc, refresh, toast]);
 
@@ -338,7 +336,7 @@ function ResearchSection({ companyId, projectId }: { companyId: string; projectI
         <div style={FLEX}>
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e: any) => setQuery(e.target.value)}
             placeholder="Research query (e.g. 'How can we reduce onboarding time?')"
             style={{ ...INPUT, flex: 1 }}
             onKeyDown={(e) => e.key === "Enter" && handleStart()}
@@ -350,8 +348,8 @@ function ResearchSection({ companyId, projectId }: { companyId: string; projectI
         {isRunning && (
           <>
             <div style={{ display: "grid", gap: 8 }}>
-              <input value={findingTitle} onChange={(e) => setFindingTitle(e.target.value)} placeholder="Finding title" style={INPUT} />
-              <textarea value={findingDesc} onChange={(e) => setFindingDesc(e.target.value)} placeholder="Finding description" style={{ ...INPUT, minHeight: 60, resize: "vertical" }} />
+              <input value={findingTitle} onChange={(e: any) => setFindingTitle(e.target.value)} placeholder="Finding title" style={INPUT} />
+              <textarea value={findingDesc} onChange={(e: any) => setFindingDesc(e.target.value)} placeholder="Finding description" style={{ ...INPUT, minHeight: 60, resize: "vertical" }} />
               <div style={FLEX}>
                 <button onClick={handleAddFinding} style={BTN_PRIMARY}>Add Finding</button>
                 <button onClick={handleComplete} style={BTN}>Mark Complete</button>
@@ -408,7 +406,7 @@ function SwipeSection({ companyId, projectId }: { companyId: string; projectId: 
         setQueue([]);
       }
     } catch (e) {
-      toast({ message: `Swipe failed: ${e}`, type: "error" });
+      toast({ title: `Swipe failed: ${e}`, tone: "error" });
     }
   }, [recordSwipe, companyId, projectId, current, refresh, currentIndex, queue, toast]);
 
@@ -444,7 +442,7 @@ function SwipeSection({ companyId, projectId }: { companyId: string; projectId: 
           </div>
         )}
         <div style={FLEX}>
-          {current.tags?.map((tag) => <span key={tag} style={TAG}>{tag}</span>)}
+          {current.tags?.map((tag: string) => <span key={tag} style={TAG}>{tag}</span>)}
           {current.category && <span style={{ ...TAG, background: "#eef2ff", color: "#4f46e5" }}>{current.category}</span>}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -498,15 +496,15 @@ function IdeasSection({ companyId, projectId }: { companyId: string; projectId: 
     try {
       const result = await createIdea({ companyId, projectId, title: newTitle.trim(), description: newDesc.trim() }) as { duplicateAnnotated?: boolean; duplicateSimilarity?: number };
       if (result.duplicateAnnotated) {
-        toast({ message: `Idea added (marked as duplicate, similarity: ${Math.round((result.duplicateSimilarity ?? 0) * 100)}%)`, type: "warning" });
+        toast({ title: `Idea added (marked as duplicate, similarity: ${Math.round((result.duplicateSimilarity ?? 0) * 100)}%)`, tone: "warn" });
       } else {
-        toast({ message: "Idea created", type: "success" });
+        toast({ title: "Idea created", tone: "success" });
       }
       setNewTitle("");
       setNewDesc("");
       await refresh();
     } catch (e) {
-      toast({ message: `Failed: ${e}`, type: "error" });
+      toast({ title: `Failed: ${e}`, tone: "error" });
     } finally {
       setAdding(false);
     }
@@ -523,12 +521,12 @@ function IdeasSection({ companyId, projectId }: { companyId: string; projectId: 
     <Section title="Ideas">
       <div style={{ display: "grid", gap: 12 }}>
         <div style={FLEX}>
-          <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="New idea title" style={{ ...INPUT, flex: 1 }} onKeyDown={(e) => e.key === "Enter" && handleAdd()} />
+          <input value={newTitle} onChange={(e: any) => setNewTitle(e.target.value)} placeholder="New idea title" style={{ ...INPUT, flex: 1 }} onKeyDown={(e) => e.key === "Enter" && handleAdd()} />
           <button onClick={handleAdd} disabled={adding || !newTitle.trim()} style={adding ? { ...BTN_PRIMARY, opacity: 0.6 } : BTN_PRIMARY}>
             {adding ? "Adding…" : "Add Idea"}
           </button>
         </div>
-        <textarea value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Description (optional)" style={{ ...INPUT, minHeight: 48, resize: "vertical" }} />
+        <textarea value={newDesc} onChange={(e: any) => setNewDesc(e.target.value)} placeholder="Description (optional)" style={{ ...INPUT, minHeight: 48, resize: "vertical" }} />
 
         <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #e2e8f0", paddingBottom: 0 }}>
           {tabs.map((t) => (
@@ -634,7 +632,7 @@ function PreferenceSection({ companyId, projectId }: { companyId: string; projec
         {catEntries.length > 0 && (
           <div>
             <div style={{ fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 8 }}>Category Preferences</div>
-            {catEntries.slice(0, 6).map(([cat, prefs]) => (
+            {catEntries.slice(0, 6).map(([cat, prefs]: [string, { pass: number; maybe: number; yes: number; now: number }]) => (
               <div key={cat} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, fontSize: 12 }}>
                 <span style={{ minWidth: 100, color: "#475569" }}>{cat}</span>
                 <div style={{ flex: 1, height: 6, borderRadius: 3, background: "#e2e8f0", overflow: "hidden" }}>
@@ -649,7 +647,7 @@ function PreferenceSection({ companyId, projectId }: { companyId: string; projec
           <div>
             <div style={{ fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 8 }}>Top Tags</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {tagEntries.slice(0, 12).map(([tag, prefs]) => (
+              {tagEntries.slice(0, 12).map(([tag, prefs]: [string, { pass: number; maybe: number; yes: number; now: number }]) => (
                 <span key={tag} style={{ ...TAG, background: prefs.yes + prefs.now > prefs.pass ? "#f0fdf4" : "#fef2f2", color: prefs.yes + prefs.now > prefs.pass ? "#16a34a" : "#dc2626" }}>
                   {tag} ({prefs.yes + prefs.now})
                 </span>
@@ -683,9 +681,9 @@ function DeliveryRunsSection({ companyId, projectId }: { companyId: string; proj
       await createRun({ companyId, projectId, ideaId: selectedIdea });
       setSelectedIdea("");
       await refresh();
-      toast({ message: "Delivery run created", type: "success" });
+      toast({ title: "Delivery run created", tone: "success" });
     } catch (e) {
-      toast({ message: `Failed: ${e}`, type: "error" });
+      toast({ title: `Failed: ${e}`, tone: "error" });
     } finally {
       setCreating(false);
     }
@@ -695,7 +693,7 @@ function DeliveryRunsSection({ companyId, projectId }: { companyId: string; proj
     <Section title="Delivery Runs">
       <div style={{ display: "grid", gap: 12 }}>
         <div style={FLEX}>
-          <select value={selectedIdea} onChange={(e) => setSelectedIdea(e.target.value)} style={{ ...INPUT, flex: 1 }}>
+          <select value={selectedIdea} onChange={(e: any) => setSelectedIdea(e.target.value)} style={{ ...INPUT, flex: 1 }}>
             <option value="">Select approved idea…</option>
             {approvedIdeas.map((i) => <option key={i.ideaId} value={i.ideaId}>{i.title}</option>)}
           </select>
@@ -797,18 +795,18 @@ function CheckpointSection({ companyId, projectId }: { companyId: string; projec
       await createCheckpoint({ companyId, projectId, runId: selectedRun, label: label || undefined });
       setLabel("");
       await refresh();
-      toast({ message: "Checkpoint created", type: "success" });
+      toast({ title: "Checkpoint created", tone: "success" });
     } catch (e) {
-      toast({ message: `Failed: ${e}`, type: "error" });
+      toast({ title: `Failed: ${e}`, tone: "error" });
     }
   }, [createCheckpoint, companyId, projectId, selectedRun, label, refresh, toast]);
 
   const handleResume = useCallback(async (checkpointId: string) => {
     try {
       await resumeFromCheckpoint({ companyId, projectId, runId: selectedRun, checkpointId });
-      toast({ message: "Resumed from checkpoint", type: "success" });
+      toast({ title: "Resumed from checkpoint", tone: "success" });
     } catch (e) {
-      toast({ message: `Failed: ${e}`, type: "error" });
+      toast({ title: `Failed: ${e}`, tone: "error" });
     }
   }, [resumeFromCheckpoint, companyId, projectId, selectedRun, toast]);
 
@@ -818,11 +816,11 @@ function CheckpointSection({ companyId, projectId }: { companyId: string; projec
     <Section title="Checkpoints">
       <div style={{ display: "grid", gap: 12 }}>
         <div style={FLEX}>
-          <select value={selectedRun} onChange={(e) => setSelectedRun(e.target.value)} style={{ ...INPUT, flex: 1 }}>
+          <select value={selectedRun} onChange={(e: any) => setSelectedRun(e.target.value)} style={{ ...INPUT, flex: 1 }}>
             <option value="">All runs</option>
             {runs?.map((r) => <option key={r.runId} value={r.runId}>{r.title.slice(0, 50)}</option>)}
           </select>
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Checkpoint label (optional)" style={{ ...INPUT, flex: 1 }} />
+          <input value={label} onChange={(e: any) => setLabel(e.target.value)} placeholder="Checkpoint label (optional)" style={{ ...INPUT, flex: 1 }} />
           <button onClick={handleCreate} disabled={!selectedRun} style={!selectedRun ? { ...BTN_PRIMARY, opacity: 0.6 } : BTN_PRIMARY}>Save Checkpoint</button>
         </div>
         {filtered.length === 0 ? (
@@ -846,7 +844,7 @@ function CheckpointSection({ companyId, projectId }: { companyId: string; projec
 function DigestsSection({ companyId, projectId }: { companyId: string; projectId: string }) {
   const dismissDigest = usePluginAction(ACTION_KEYS.dismissDigest);
   const { data: digests, refresh } = usePluginData<Digest[]>(DATA_KEYS.digests, { companyId, projectId });
-  const PRIORITY_COLORS = { critical: "#dc2626", high: "#f97316", medium: "#f59e0b", low: "#94a3b8" };
+  const PRIORITY_COLORS: Record<string, string> = { critical: "#dc2626", high: "#f97316", medium: "#f59e0b", low: "#94a3b8" };
 
   const handleDismiss = useCallback(async (digestId: string) => {
     try {
@@ -911,7 +909,7 @@ function LearnerSection({ companyId, projectId }: { companyId: string; projectId
                   <div style={{ color: "#64748b", marginTop: 2 }}>{s.summaryText.slice(0, 120)}{s.summaryText.length > 120 ? "…" : ""}</div>
                   {s.keyLearnings.length > 0 && (
                     <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
-                      {s.keyLearnings.map((l) => <span key={l} style={{ ...TAG, background: "#eef2ff", color: "#4f46e5" }}>{l}</span>)}
+                      {s.keyLearnings.map((l: string) => <span key={l} style={{ ...TAG, background: "#eef2ff", color: "#4f46e5" }}>{l}</span>)}
                     </div>
                   )}
                 </div>
@@ -949,7 +947,7 @@ export function AutopilotProjectTab({ context }: PluginDetailTabProps) {
   return (
     <div style={PAGE}>
       {overview && <StatsRow overview={overview} />}
-      <ProjectSettingsForm project={project} companyId={companyId} projectId={projectId} />
+      <ProjectSettingsForm project={project ?? undefined} companyId={companyId} projectId={projectId} />
       <ResearchSection companyId={companyId} projectId={projectId} />
       <SwipeSection companyId={companyId} projectId={projectId} />
       <IdeasSection companyId={companyId} projectId={projectId} />
@@ -1008,7 +1006,8 @@ export function AutopilotProjectWidget({ context }: PluginWidgetProps) {
 }
 
 // ─── Dashboard Widget ──────────────────────────────────────────────────────────
-export function AutopilotDashboardWidget({ context }: PluginDashboardProps) {
+// NOTE: dashboardWidget slot is registered in manifest — this component uses PluginWidgetProps
+export function AutopilotDashboardWidget({ context }: PluginWidgetProps) {
   const { companyId } = context ?? {};
   const { data: overview } = usePluginData<AutopilotOverview>("autopilot-overview", { companyId: companyId ?? "", projectId: "" });
 
@@ -1039,108 +1038,14 @@ export function AutopilotDashboardWidget({ context }: PluginDashboardProps) {
   );
 }
 
-// ─── Settings Page ─────────────────────────────────────────────────────────────
-export function AutopilotSettings({ context }: PluginSettingsProps) {
-  const { companyId } = context ?? {};
-  const { data: projects } = usePluginData<AutopilotProject[]>(DATA_KEYS.autopilotProjects, { companyId: companyId ?? "" });
-
-  return (
-    <div style={{ padding: 24 }}>
-      <h2 style={{ marginBottom: 20, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>Autopilot Settings</h2>
-      <div style={{ display: "grid", gap: 12 }}>
-        {!projects || projects.length === 0 ? (
-          <div style={{ color: "#94a3b8", fontSize: 13 }}>No projects with Autopilot enabled.</div>
-        ) : projects.map((p) => (
-          <div key={p.autopilotId} style={CARD}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-              <StatusBadge status={p.enabled ? "active" : "inactive"} />
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{p.projectId}</span>
-              <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8" }}>{p.automationTier}</span>
-            </div>
-            <div style={{ fontSize: 12, color: "#64748b" }}>
-              Budget: {p.budgetMinutes} min/mo · {p.autoCreatePrs ? "PRs auto-created" : "Manual PRs"}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+// ─── Settings Page (stub — slot removed) ───────────────────────────────────────
+export function AutopilotSettings(_props: { context?: any }) {
+  return null;
 }
 
-// ─── Run Detail Tab ────────────────────────────────────────────────────────────
-export function AutopilotRunDetailTab({ context }: PluginRunDetailTabProps) {
-  const { companyId, entityId: runId, projectId } = context ?? {};
-  const { data: run } = usePluginData<DeliveryRun>(DATA_KEYS.deliveryRun, { companyId: companyId ?? "", projectId: projectId ?? "", runId: runId ?? "" });
-  const { data: tasks } = usePluginData<ConvoyTask[]>(DATA_KEYS.convoyTasks, { companyId: companyId ?? "", projectId: projectId ?? "", runId: runId ?? "" });
-  const { data: checkpoints } = usePluginData<Checkpoint[]>(DATA_KEYS.checkpoints, { companyId: companyId ?? "", projectId: projectId ?? "", runId: runId ?? "" });
-  const { data: locks } = usePluginData<ProductLock[]>(DATA_KEYS.productLocks, { companyId: companyId ?? "", projectId: projectId ?? "" });
-
-  if (!run) return <LoadingState />;
-
-  return (
-    <div style={PAGE}>
-      <div style={CARD}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
-          <StatusBadge status={run.status} />
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{run.title}</span>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, fontSize: 13, color: "#64748b" }}>
-          <div>Branch: <code style={{ background: "#f1f5f9", padding: "1px 5px", borderRadius: 4 }}>{run.branchName}</code></div>
-          <div>Tier: {run.automationTier}</div>
-          <div>Port: {run.leasedPort ?? "—"}</div>
-          {run.commitSha && <div>Commit: <code style={{ background: "#f1f5f9", padding: "1px 5px", borderRadius: 4 }}>{run.commitSha.slice(0, 7)}</code></div>}
-          {run.prUrl && <div><a href={run.prUrl} target="_blank" rel="noopener noreferrer">View PR ↗</a></div>}
-        </div>
-        {run.pauseReason && (
-          <div style={{ marginTop: 10, padding: "8px 12px", background: "#fffbeb", borderRadius: 8, fontSize: 13, color: "#92400e" }}>
-            Paused: {run.pauseReason}
-          </div>
-        )}
-        {run.error && (
-          <div style={{ marginTop: 10, padding: "8px 12px", background: "#fef2f2", borderRadius: 8, fontSize: 13, color: "#991b1b" }}>
-            Error: {run.error}
-          </div>
-        )}
-      </div>
-
-      {tasks && tasks.length > 0 && (
-        <Section title="Convoy Tasks">
-          <div style={{ display: "grid", gap: 6 }}>
-            {tasks.map((t) => (
-              <div key={t.taskId} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0", borderBottom: "1px solid #f8fafc" }}>
-                <StatusBadge status={t.status} />
-                <span style={{ flex: 1, fontSize: 13 }}>{t.title}</span>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {checkpoints && checkpoints.length > 0 && (
-        <Section title="Checkpoints">
-          <div style={{ display: "grid", gap: 4 }}>
-            {checkpoints.map((cp) => (
-              <div key={cp.checkpointId} style={{ fontSize: 12, color: "#64748b", padding: "4px 0" }}>
-                {cp.label ?? `Checkpoint ${cp.checkpointId.slice(0, 8)}`} — {new Date(cp.createdAt).toLocaleString()}
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {locks && locks.filter((l) => l.isActive).length > 0 && (
-        <Section title="Active Locks">
-          <div style={{ display: "grid", gap: 4 }}>
-            {locks.filter((l) => l.isActive).map((l) => (
-              <div key={l.lockId} style={{ fontSize: 12, color: "#64748b" }}>
-                <StatusBadge status="active" /> {l.lockType} on <code>{l.targetBranch}</code>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-    </div>
-  );
+// ─── Run Detail Tab (stub — slot removed) ──────────────────────────────────────
+export function AutopilotRunDetailTab(_props: { context?: any }) {
+  return null;
 }
 
 export default { AutopilotProjectTab, AutopilotSidebarLink, AutopilotProjectWidget, AutopilotDashboardWidget, AutopilotSettings, AutopilotRunDetailTab };
