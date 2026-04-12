@@ -50,6 +50,7 @@ describe("ideation service", () => {
 
     expect(withProfile.impactScore).toBeGreaterThan(withoutProfile.impactScore);
     expect(withProfile.rankingScore).toBeGreaterThan(withoutProfile.rankingScore);
+    expect(withProfile.explanation).toContain("preferenceBoost=");
   });
 
   it("ranks findings stably by score, confidence, then title", () => {
@@ -75,7 +76,7 @@ describe("ideation service", () => {
     });
 
     expect(idea.title).toContain("Improve onboarding completion");
-    expect(idea.rationale).toContain("confidence 0.90");
+    expect(idea.rationale).toContain("confidence=0.90");
     expect(idea.sourceReferences).toEqual(["https://example.com/source"]);
     expect(idea.impactScore).toBeGreaterThan(70);
   });

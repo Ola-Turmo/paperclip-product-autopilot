@@ -70,6 +70,7 @@ export function scoreFindingForIdea(
   impactScore: number;
   feasibilityScore: number;
   rankingScore: number;
+  explanation: string;
 } {
   const confidenceBoost = (finding.confidence - 0.5) * 24;
   const preferenceBoost = computePreferenceBoost(profile, finding.category);
@@ -77,14 +78,21 @@ export function scoreFindingForIdea(
   const impactScore = clampScore(categoryBaseImpact(finding.category) + confidenceBoost + preferenceBoost);
   const feasibilityScore = clampScore(categoryBaseFeasibility(finding.category) + confidenceBoost / 2 + preferenceBoost / 2);
   const rankingScore = clampScore(impactScore * 0.65 + feasibilityScore * 0.35);
+  const explanation = [
+    `category=${finding.category ?? "general"}`,
+    `confidence=${finding.confidence.toFixed(2)}`,
+    `preferenceBoost=${preferenceBoost.toFixed(1)}`,
+    `impact=${impactScore}`,
+    `feasibility=${feasibilityScore}`,
+  ].join(", ");
 
-  return { impactScore, feasibilityScore, rankingScore };
+  return { impactScore, feasibilityScore, rankingScore, explanation };
 }
 
 export function rankFindingsForIdeation(
   findings: ResearchFinding[],
   profile?: PreferenceProfile | null,
-): Array<ResearchFinding & { rankingScore: number; impactScore: number; feasibilityScore: number }> {
+): Array<ResearchFinding & { rankingScore: number; impactScore: number; feasibilityScore: number; explanation: string }> {
   return findings
     .map((finding) => ({
       ...finding,
@@ -116,7 +124,7 @@ export function buildIdeaDraftFromFinding(input: {
     cycleId: input.finding.cycleId,
     title: normalizedTitle ? `Improve ${normalizedTitle}` : "Improve product experience",
     description: input.finding.description || "Generated from research insights",
-    rationale: `Evidence-backed from ${sourceLabel} with confidence ${input.finding.confidence.toFixed(2)}`,
+    rationale: `Evidence-backed from ${sourceLabel}; ${scored.explanation}`,
     sourceReferences: input.finding.sourceUrl ? [input.finding.sourceUrl] : [],
     impactScore: scored.impactScore,
     feasibilityScore: scored.feasibilityScore,

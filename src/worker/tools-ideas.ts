@@ -33,7 +33,9 @@ export function registerIdeaToolHandlers(ctx: PluginContext) {
     },
   }, async (params, _runCtx): Promise<ToolResult> => {
     const a = params as { companyId: string; projectId: string; title: string; description?: string; rationale?: string; sourceReferences?: string[]; impactScore?: number };
-    const duplicate = await findDuplicateIdea(ctx, a.companyId, a.projectId, a.title, a.description ?? "");
+    const duplicate = await findDuplicateIdea(ctx, a.companyId, a.projectId, a.title, a.description ?? "", undefined, {
+      sourceReferences: a.sourceReferences,
+    });
     const idea: Idea = {
       ideaId: newId(),
       companyId: a.companyId,
@@ -53,7 +55,7 @@ export function registerIdeaToolHandlers(ctx: PluginContext) {
     };
     await repo.upsertIdea(idea);
     return {
-      content: `Idea created: ${idea.ideaId}\nTitle: ${idea.title}\nDuplicate annotated: ${idea.duplicateAnnotated}`,
+      content: `Idea created: ${idea.ideaId}\nTitle: ${idea.title}\nDuplicate annotated: ${idea.duplicateAnnotated}${duplicate ? `\nDuplicate reasons: ${duplicate.reasons.join(", ")}` : ""}`,
     };
   });
 
@@ -139,7 +141,11 @@ export function registerIdeaToolHandlers(ctx: PluginContext) {
         createdAt: nowIso(),
         profile,
       });
-      const duplicate = await findDuplicateIdea(ctx, a.companyId, a.projectId, idea.title, idea.description);
+      const duplicate = await findDuplicateIdea(ctx, a.companyId, a.projectId, idea.title, idea.description, undefined, {
+        category: idea.category,
+        tags: idea.tags,
+        sourceReferences: idea.sourceReferences,
+      });
       if (duplicate) {
         if (seenDuplicateIds.has(duplicate.idea.ideaId)) {
           continue;
@@ -176,7 +182,7 @@ export function registerIdeaToolHandlers(ctx: PluginContext) {
     }
 
     return {
-      content: `Generated ${created.length} ideas:\n${created.map((idea) => ` - ${idea.title} (impact: ${idea.impactScore})`).join("\n")}`,
+      content: `Generated ${created.length} ideas:\n${created.map((idea) => ` - ${idea.title} (impact: ${idea.impactScore}, feasibility: ${idea.feasibilityScore})`).join("\n")}`,
     };
   });
 }

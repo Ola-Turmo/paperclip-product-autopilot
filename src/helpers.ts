@@ -43,6 +43,7 @@ import {
   rollbackActionSchema,
   researchCycleSchema,
 } from "./schemas.js";
+import { scoreIdeaDuplicateCandidate } from "./services/duplicates.js";
 
 // ─── Time helpers ─────────────────────────────────────────────────────────────
 export function nowIso(): string {
@@ -388,44 +389,34 @@ export async function listMaybePoolIdeas(
   return listIdeas(ctx, companyId, projectId, "maybe");
 }
 
-// Normalize idea text for duplicate detection
-function normalizeIdeaText(text: string): string {
-  return text.toLowerCase().replace(/\s+/g, " ").trim();
-}
-
-// Compute similarity between two idea texts (0-1)
-function computeTextSimilarity(a: string, b: string): number {
-  const normA = normalizeIdeaText(a);
-  const normB = normalizeIdeaText(b);
-  if (normA === normB) return 1;
-  if (normA.includes(normB) || normB.includes(normA)) return 0.9;
-  const wordsA = new Set(normA.split(" "));
-  const wordsB = new Set(normB.split(" "));
-  if (wordsA.size === 0 || wordsB.size === 0) return 0;
-  const intersection = [...wordsA].filter((w) => wordsB.has(w)).length;
-  const union = new Set([...wordsA, ...wordsB]).size;
-  return intersection / union;
-}
-
 export async function findDuplicateIdea(
   ctx: PluginContext,
   companyId: string,
   projectId: string,
   title: string,
   description: string,
-  excludeIdeaId?: string
-): Promise<{ idea: Idea; similarity: number } | null> {
+  excludeIdeaId?: string,
+  options?: {
+    category?: string;
+    tags?: string[];
+    sourceReferences?: string[];
+  }
+): Promise<{ idea: Idea; similarity: number; reasons: string[] } | null> {
   const ideas = await listIdeas(ctx, companyId, projectId);
-  const candidate = normalizeIdeaText(`${title} ${description}`);
-  let best: { idea: Idea; similarity: number } | null = null;
+  let best: { idea: Idea; similarity: number; reasons: string[] } | null = null;
 
   for (const idea of ideas) {
     if (excludeIdeaId && idea.ideaId === excludeIdeaId) continue;
     if (!["active", "maybe"].includes(idea.status)) continue;
-    const existing = normalizeIdeaText(`${idea.title} ${idea.description}`);
-    const sim = computeTextSimilarity(candidate, existing);
-    if (sim >= 0.75 && (!best || sim > best.similarity)) {
-      best = { idea, similarity: sim };
+    const scored = scoreIdeaDuplicateCandidate({
+      title,
+      description,
+      category: options?.category,
+      tags: options?.tags,
+      sourceReferences: options?.sourceReferences,
+    }, idea);
+    if (scored.similarity >= 0.75 && (!best || scored.similarity > best.similarity)) {
+      best = { idea, similarity: scored.similarity, reasons: scored.reasons };
     }
   }
   return best;
