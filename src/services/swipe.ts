@@ -1,5 +1,6 @@
 import type { Idea, PreferenceProfile, SwipeEvent } from "../types.js";
 import type { IdeaStatus, SwipeDecision } from "../constants.js";
+import { transitionIdeaStatus } from "./state-machines.js";
 
 export function deriveIdeaStatusFromSwipe(currentStatus: IdeaStatus, decision: SwipeDecision): IdeaStatus {
   if (decision === "pass") return "rejected";
@@ -52,9 +53,5 @@ export function createEmptyPreferenceProfile(input: {
 }
 
 export function applySwipeToIdea(idea: Idea, decision: SwipeDecision, updatedAt: string): Idea {
-  return {
-    ...idea,
-    status: deriveIdeaStatusFromSwipe(idea.status, decision),
-    updatedAt,
-  };
+  return transitionIdeaStatus(idea, deriveIdeaStatusFromSwipe(idea.status, decision), updatedAt);
 }

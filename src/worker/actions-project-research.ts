@@ -34,6 +34,7 @@ import {
   parsePositiveInt,
   requireCompanyAndProject,
 } from "./action-utils.js";
+import { transitionIdeaStatus } from "../services/state-machines.js";
 
 export function registerProjectResearchActionHandlers(ctx: PluginContext) {
   ctx.actions.register(ACTION_KEYS.saveAutopilotProject, async (args) => {
@@ -251,7 +252,9 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
     const a = args as { companyId: string; projectId: string; ideaId: string; status?: IdeaStatus };
     const idea = await getIdea(ctx, a.companyId, a.projectId, a.ideaId);
     if (!idea) throw new Error("Idea not found");
-    const updated: Idea = { ...idea, status: a.status ?? idea.status, updatedAt: nowIso() };
+    const updated: Idea = a.status
+      ? transitionIdeaStatus(idea, a.status, nowIso())
+      : { ...idea, updatedAt: nowIso() };
     await upsertIdea(ctx, updated);
     return updated;
   });

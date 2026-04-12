@@ -132,7 +132,7 @@ describe("worker integration", () => {
 
   it("creates and completes a delivery run while releasing workspace resources", async () => {
     await upsertAutopilotProject(harness.ctx, createProject());
-    await upsertIdea(harness.ctx, createIdea());
+    await upsertIdea(harness.ctx, createIdea({ status: "approved" }));
 
     const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
       companyId: "company-1",
@@ -266,12 +266,17 @@ describe("worker integration", () => {
 
   it("emits metrics and telemetry for checkpoint, health-check, and rollback actions", async () => {
     await upsertAutopilotProject(harness.ctx, createProject());
-    await upsertIdea(harness.ctx, createIdea());
+    await upsertIdea(harness.ctx, createIdea({ status: "approved" }));
     const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
       companyId: "company-1",
       projectId: "project-1",
       ideaId: "idea-1",
       artifactId: "artifact-1",
+    });
+    await harness.performAction(ACTION_KEYS.resumeDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
     });
 
     const checkpoint = await harness.performAction<{ checkpointId: string }>(ACTION_KEYS.createCheckpoint, {
@@ -319,5 +324,45 @@ describe("worker integration", () => {
         "rollback_triggered",
       ]),
     );
+  });
+
+  it("rejects invalid delivery and rollback transitions", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertIdea(harness.ctx, createIdea({ status: "active" }));
+
+    await expect(
+      harness.performAction(ACTION_KEYS.createDeliveryRun, {
+        companyId: "company-1",
+        projectId: "project-1",
+        ideaId: "idea-1",
+        artifactId: "artifact-1",
+      }),
+    ).rejects.toThrow("approved idea");
+
+    await upsertIdea(harness.ctx, createIdea({ ideaId: "idea-2", status: "approved" }));
+    const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-2",
+      artifactId: "artifact-2",
+    });
+    const check = await harness.performAction<{ checkId: string }>(ACTION_KEYS.createReleaseHealthCheck, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkType: "smoke_test",
+      name: "Smoke",
+    });
+
+    await expect(
+      harness.performAction(ACTION_KEYS.triggerRollback, {
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: run.runId,
+        checkId: check.checkId,
+        rollbackType: "restore_checkpoint",
+        checkpointId: "checkpoint-missing",
+      }),
+    ).rejects.toThrow("failed health check");
   });
 });

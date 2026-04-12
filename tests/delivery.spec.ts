@@ -13,6 +13,7 @@ import {
   shouldReleaseRunResources,
   updateDeliveryRunStatus,
 } from "../src/services/delivery.js";
+import { transitionIdeaStatus } from "../src/services/state-machines.js";
 import type { AutopilotProject, Idea } from "../src/types.js";
 
 function createIdea(): Idea {
@@ -179,5 +180,43 @@ describe("delivery services", () => {
     expect(lock.isActive).toBe(false);
     expect(shouldReleaseRunResources("completed")).toBe(true);
     expect(shouldReleaseRunResources("running")).toBe(false);
+  });
+
+  it("rejects invalid run lifecycle transitions", () => {
+    const run = buildPendingDeliveryRun({
+      runId: "run-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-1",
+      artifactId: "artifact-1",
+      idea: createIdea(),
+      automationTier: "semiauto",
+      branchName: "autopilot/project1/idea1",
+      workspacePath: "/tmp/project",
+      leasedPort: 3001,
+      createdAt: "2026-01-02T00:00:00.000Z",
+    });
+
+    const completed = updateDeliveryRunStatus({
+      run,
+      status: "completed",
+      updatedAt: "2026-01-03T00:00:00.000Z",
+    });
+
+    expect(() =>
+      pauseDeliveryRun(completed, "2026-01-03T01:00:00.000Z", "late pause"),
+    ).toThrow("Invalid delivery run transition");
+  });
+
+  it("rejects invalid idea transitions", () => {
+    const approved = transitionIdeaStatus(
+      { ...createIdea(), status: "approved" },
+      "in_progress",
+      "2026-01-02T00:00:00.000Z",
+    );
+
+    expect(() =>
+      transitionIdeaStatus(approved, "maybe", "2026-01-03T00:00:00.000Z"),
+    ).toThrow("Invalid idea transition");
   });
 });

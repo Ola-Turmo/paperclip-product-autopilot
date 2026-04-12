@@ -413,113 +413,181 @@ Acceptance criteria:
 - Evaluate research freshness and signal diversity.
 - Evaluate autonomy safety using replay fixtures.
 
-## 15. Living Backlog
+## 15. Current State
 
-This section replaces phase-based planning. It should be kept current as implementation progresses.
+Status on `main` as of 2026-04-12:
 
-### In Progress
+- `npm run typecheck` passes
+- `npm test` passes
+- `npm run build` passes
+- `npm pack --dry-run` passes
+- CI exists
+- Build is portable
+- Manifest and packaging are aligned with the current SDK surface
+- Runtime validation exists for core entities
+- Worker registrations are split into data, actions, tools, and jobs
+- Action handlers are split by domain
 
-- [x] Add a dedicated PRD and execution document in `docs/`.
-- [x] Make the root `src/*` tree the authoritative implementation path and reduce nested `src/autopilot/*` files to wrappers.
-- [x] Align plugin manifest categories, capabilities, slot types, and entity types with the current Paperclip SDK.
-- [x] Replace the hard-coded SDK alias in [esbuild.config.mjs](/G:/My%20Drive/_local/_myrepos/paperclip-product-autopilot/esbuild.config.mjs) with a portable build setup.
-- [x] Ensure `paperclipPlugin` output paths and manifest entrypoints point to the root build artifacts.
-- [x] Replace outdated UI SDK assumptions with current APIs.
-- [x] Get `npm run typecheck` and `npm run build` passing from a clean clone.
-- [x] Add baseline automated tests so `npm test` passes.
-- [x] Add CI for install, typecheck, test, and build.
-- [x] Add runtime schema validation for core persisted entities.
-- [x] Extract overview aggregation and budget/stuck-run policy logic into testable services.
-- [x] Extract swipe decision and maybe-pool resurfacing logic into testable services.
-- [x] Extract planning artifact and delivery bootstrap builders into testable services.
-- [x] Add worker integration tests for swipe actions, delivery lifecycle, and maybe-pool resurfacing jobs.
-- [x] Unify the action/tool swipe paths so they create matching downstream state.
-- [x] Deduplicate pending sweep digests so hourly jobs do not spam repeated alerts.
-- [x] Add typed repository and orchestration layers for the main swipe/digest workflows.
-- [x] Add lifecycle builders, validation, and observability for checkpoints, release health, and rollback flows.
-- [x] Extract worker data, tool, and job registration into dedicated module files.
+Important caveat:
 
-### Next
+- The system is now structurally credible, but not yet state of the art. The remaining work is primarily around formal correctness, better decision quality, richer operator tooling, and evaluation.
 
-- [ ] Split [src/worker.ts](/G:/My%20Drive/_local/_myrepos/paperclip-product-autopilot/src/worker.ts) into domain services, repositories, actions, tools, jobs, and policies.
-- [ ] Formalize state machines for idea, run, digest, checkpoint, and rollback transitions.
-- [ ] Introduce runtime validation for persisted entities.
-- [ ] Add typed repository interfaces around `ctx.entities`.
-- [ ] Add unit tests for helpers and domain services.
-- [ ] Add manifest contract tests and UI smoke tests.
-- [ ] Add CI for install, typecheck, build, and test.
-- [ ] Define structured event logging and metrics primitives.
+## 16. Complete Todo
 
-### Later
+This is the authoritative backlog. Keep this list current. Do not create separate phased plans or duplicate issue lists.
 
-- [ ] Define signal ingestion interfaces.
-- [ ] Add structured provenance fields to research findings.
-- [ ] Add a stronger idea scoring and ranking framework.
-- [ ] Improve duplicate detection beyond simple token overlap.
-- [ ] Expand preference learning beyond raw swipe counts.
-- [ ] Add replay evaluation for idea ranking and safety behavior.
-- [ ] Add run audit timeline and evidence drill-down.
-- [ ] Add policy-gated delivery actions and stronger rollback semantics.
+### 16.1 Core architecture
 
-## 16. Prioritized Backlog
+- [x] Make `src/*` the authoritative source tree.
+- [x] Split worker registration into data, actions, tools, and jobs modules.
+- [x] Split action handlers into domain modules.
+- [ ] Move tool handlers into smaller domain modules instead of one file.
+- [ ] Move job handlers into smaller domain modules instead of one file.
+- [ ] Replace remaining direct helper calls in handlers with typed repository usage.
+- [~] Expand the repository layer so all major entity access goes through repository interfaces.
+- [ ] Separate pure domain logic from Paperclip adapter logic more aggressively.
+- [ ] Introduce mappers or translators where plugin-facing DTOs and domain entities should diverge.
+- [ ] Create a small domain package structure for state machines, policies, and scoring logic.
 
-### P0
+### 16.2 State machines and invariants
 
-- Fix manifest contract mismatches
-- Fix UI SDK mismatches
-- Remove duplicate source-tree ambiguity
-- Make build portable
-- Add tests folder and baseline test coverage
-- Add CI
+- [x] Formalize the idea lifecycle as an explicit state machine.
+- [x] Formalize the delivery-run lifecycle as an explicit state machine.
+- [ ] Formalize the digest lifecycle as an explicit state machine.
+- [x] Formalize checkpoint and rollback lifecycles as explicit state machines.
+- [~] Prevent invalid transitions centrally instead of in scattered handlers.
+- [ ] Add invariant validation helpers for impossible or contradictory entity states.
+- [~] Add transition tests for every allowed and disallowed lifecycle step.
+- [ ] Add invariant checks into runtime validation paths where appropriate.
 
-### P1
+### 16.3 Persistence and schemas
 
-- Extract services from monolithic worker
-- Formalize state machines
-- Improve duplicate detection
-- Build run audit timeline
-- Add structured event taxonomy
+- [x] Add runtime validation for core entities.
+- [ ] Extend schema coverage to every persisted entity type.
+- [ ] Audit entity keys, scope rules, and lookup patterns for consistency.
+- [ ] Add repository tests that assert entity persistence shape and lookup semantics.
+- [ ] Reduce duplicate entity-query patterns by consolidating common repository methods.
+- [ ] Add migration notes or compatibility policy for future schema changes.
 
-### P2
+### 16.4 Research intelligence
 
-- Rich preference learning
-- Advanced ranking
-- Replay evaluation harness
-- Enhanced dashboarding
+- [ ] Define signal-ingestion interfaces for research inputs.
+- [ ] Add first-class provenance fields and source-quality scoring.
+- [ ] Add freshness and confidence policies for findings.
+- [ ] Add deduplication for research findings, not just ideas.
+- [ ] Add support for grouping findings by signal family and topic.
+- [ ] Add reproducible research-cycle snapshots.
+- [ ] Add deterministic tests for provenance, dedupe, and freshness behavior.
 
-### P3
+### 16.5 Idea generation and ranking
 
-- Enterprise governance features
-- Advanced analytics connectors
-- Multi-project optimization
+- [ ] Remove heuristic randomness from idea generation.
+- [ ] Replace the current simplistic idea generation path with evidence-backed generation inputs.
+- [ ] Build a deterministic scoring model for impact, feasibility, confidence, and strategic alignment.
+- [ ] Add explicit ranking explanations for every suggested idea.
+- [ ] Improve duplicate detection beyond simple overlap heuristics.
+- [ ] Add similarity fixtures and regression tests for duplicate handling.
+- [ ] Add scoring calibration fixtures so ranking behavior remains stable over time.
 
-## 17. Open Questions
+### 16.6 Preference learning and feedback loops
 
-- Which Paperclip SDK version and plugin APIs are the true long-term target?
-- What external systems are first-class signal sources in V1?
-- What actions are allowed in full-auto mode, and which must remain supervised forever?
-- How should outcome measurement be wired into product analytics?
-- What organizational guardrails are required before enabling autonomous delivery by default?
+- [ ] Expand preference learning beyond swipe counts.
+- [ ] Incorporate outcomes such as delivery success, rollback, health-check failure, and completion time.
+- [ ] Track category, complexity, and execution-mode preference signals separately.
+- [ ] Make preference explanations visible in ranking and operator review surfaces.
+- [ ] Add regression tests for preference updates from both swipes and outcomes.
 
-## 18. Immediate Next 10 Tasks
+### 16.7 Planning and delivery orchestration
 
-1. Collapse the codebase to one authoritative source tree.
-2. Update manifest definitions to match the Paperclip SDK.
-3. Fix `package.json` plugin output paths and dev scripts.
-4. Replace the non-portable esbuild alias strategy.
-5. Refactor the UI to current SDK component contracts.
-6. Add a minimal `tests/` suite for helper and manifest coverage.
-7. Add GitHub Actions CI.
-8. Split `worker.ts` into feature modules.
-9. Add runtime schemas for persisted entities.
-10. Define structured event logging and metrics primitives.
+- [x] Extract delivery builders and policy logic into services.
+- [ ] Make planning artifacts more structured and less free-form.
+- [ ] Add stronger validation for approval mode, execution mode, and checklist completeness.
+- [ ] Add convoy-task dependency validation and cycle detection.
+- [ ] Add clearer rules for when checkpoints are mandatory.
+- [ ] Add delivery-run cancellation semantics if cancellation is intended to be supported.
+- [ ] Add run-time budget accounting hooks if Paperclip exposes the right telemetry.
 
-## 19. Definition of Done
+### 16.8 Safety, rollback, and governance
 
-This PRD is complete when the project can credibly claim:
+- [x] Add checkpoint, release-health, and rollback primitives plus observability.
+- [ ] Strengthen rollback policy and rollback-action semantics.
+- [ ] Add stricter checkpoint restore validation.
+- [ ] Add release-health aggregation logic across multiple checks.
+- [ ] Add digest escalation and suppression policy.
+- [ ] Add reopen rules, cooldown windows, and dedupe keys for digests.
+- [ ] Add explicit policy gates for destructive or risky actions.
+- [ ] Define full-auto boundaries that remain hard-coded supervised.
+- [ ] Document governance policy in the repo, not just in code.
 
-- It installs, builds, tests, and packages from a clean clone.
-- It matches the current Paperclip SDK contracts.
-- It provides a safe, understandable, and auditable autonomy loop.
-- It has measurable product and system outcomes.
-- It can be trusted by a serious product team.
+### 16.9 Observability and evaluation
+
+- [x] Add basic lifecycle telemetry and metrics.
+- [ ] Define a complete event taxonomy for all important transitions.
+- [ ] Emit metrics for research, idea ranking, planning, delivery, rollbacks, and operator interventions.
+- [ ] Add duration and latency metrics, not just counters.
+- [ ] Add structured failure categories.
+- [ ] Build a replay harness for decision evaluation.
+- [ ] Add benchmark fixtures for ranking quality, safety behavior, and digest behavior.
+- [ ] Add a simple scorecard that can answer whether the system is getting better.
+
+### 16.10 UI and operator experience
+
+- [x] Replace broken UI wiring with a working SDK-aligned UI.
+- [ ] Turn the UI from a stabilization surface into a true operator console.
+- [ ] Add a run audit timeline.
+- [ ] Add evidence drill-down for ideas and research findings.
+- [ ] Add clearer intervention workflows for pause, resume, checkpoint, rollback, and note-taking.
+- [ ] Add budget and digest management surfaces.
+- [ ] Add better empty states, loading states, and error states.
+- [ ] Add UI smoke tests.
+- [ ] Add run-detail and health-check UX that exposes decision context, not just raw records.
+
+### 16.11 Testing and verification
+
+- [x] Add unit and integration coverage for the current baseline.
+- [ ] Add transition-matrix tests for state machines.
+- [ ] Add repository contract tests.
+- [ ] Add UI smoke tests.
+- [ ] Add more worker integration tests around rollback, checkpoint restore, release-health aggregation, and digest escalation.
+- [ ] Add fixture-driven tests for ranking and duplicate detection.
+- [ ] Add package-install validation in CI from a clean environment.
+- [ ] Add failure-path tests, not just happy-path tests.
+
+### 16.12 Documentation and operator trust
+
+- [x] Add this PRD/backlog document.
+- [ ] Keep this backlog updated after every major refactor.
+- [ ] Add architecture documentation for service boundaries and state ownership.
+- [ ] Add a data model reference for persisted entities and their invariants.
+- [ ] Add an operator guide describing approval boundaries, digests, rollback, and checkpoints.
+- [ ] Add a contributor guide that explains the module structure and testing expectations.
+
+## 17. Top Priority Order
+
+If choosing what to do next, prioritize in this order:
+
+1. Formal lifecycle state machines and invariants
+2. Full repository-layer adoption and remaining helper-call cleanup
+3. Better idea generation, scoring, and duplicate detection
+4. Stronger safety and digest/rollback policy
+5. Better observability and evaluation harnesses
+6. Better operator UI
+
+## 18. Definition of State-of-the-Art
+
+This project can credibly claim to be state of the art only when all of the following are true:
+
+- The core lifecycle is governed by explicit state machines and invariant enforcement.
+- Research, ideas, plans, runs, digests, and rollback actions are fully auditable.
+- Idea ranking is evidence-backed, explainable, and stable under test.
+- Preference learning improves decisions using both human input and outcome data.
+- Safety boundaries are explicit, tested, and visible in the UI.
+- Operators can understand why the system acted, what it changed, and how to intervene.
+- Evaluation harnesses show that new changes improve decision quality instead of just changing behavior.
+- The repo remains installable, buildable, testable, and packageable from a clean clone.
+
+## 19. Current Best Next Step
+
+The single best next step is:
+
+- Finish the state-machine rollout by covering digest transitions, remaining handler paths, and invariant enforcement, then continue the repository-layer adoption across the remaining action and tool modules.

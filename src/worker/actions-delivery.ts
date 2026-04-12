@@ -47,6 +47,7 @@ import {
   updateDeliveryRunStatus,
 } from "../services/delivery.js";
 import { shouldPauseForBudget } from "../services/policy.js";
+import { transitionConvoyTask } from "../services/state-machines.js";
 import {
   isConvoyTaskStatus,
   isNonEmptyString,
@@ -104,6 +105,9 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
     };
     const idea = await getIdea(ctx, a.companyId, a.projectId, a.ideaId);
     if (!idea) throw new Error("Idea not found");
+    if (idea.status !== "approved" && idea.status !== "in_progress") {
+      throw new Error(`Delivery run requires an approved idea, got ${idea.status}`);
+    }
 
     const autopilot = await getAutopilotProject(ctx, a.companyId, a.projectId);
     const runId = newId();
@@ -294,14 +298,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
     if (!task) throw new Error("Convoy task not found");
 
     const now = nowIso();
-    const updated: ConvoyTask = {
-      ...task,
-      status: a.status,
-      error: a.error,
-      startedAt: a.status === "running" ? (task.startedAt ?? now) : task.startedAt,
-      completedAt: ["passed", "failed", "skipped"].includes(a.status) ? now : task.completedAt,
-      updatedAt: now,
-    };
+    const updated: ConvoyTask = transitionConvoyTask(task, a.status, now, a.error);
     await upsertConvoyTask(ctx, updated);
 
     if (a.status === "passed") {

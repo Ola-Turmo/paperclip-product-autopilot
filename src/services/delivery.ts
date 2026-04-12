@@ -8,6 +8,7 @@ import type {
   WorkspaceLease,
 } from "../types.js";
 import type { RunStatus } from "../constants.js";
+import { transitionRunStatus } from "./state-machines.js";
 
 export function buildPlanningArtifact(input: {
   artifactId: string;
@@ -158,32 +159,31 @@ export function updateDeliveryRunStatus(input: {
 }): DeliveryRun {
   return {
     ...input.run,
-    status: input.status,
-    commitSha: input.commitSha ?? input.run.commitSha,
-    prUrl: input.prUrl,
-    error: input.error,
-    completedAt: shouldReleaseRunResources(input.status) ? input.updatedAt : null,
-    updatedAt: input.updatedAt,
+    ...transitionRunStatus(input.run, input.status, input.updatedAt, {
+      commitSha: input.commitSha,
+      prUrl: input.prUrl,
+      error: input.error,
+    }),
   };
 }
 
 export function pauseDeliveryRun(run: DeliveryRun, updatedAt: string, reason?: string): DeliveryRun {
   return {
     ...run,
-    status: "paused",
-    paused: true,
-    pauseReason: reason,
-    updatedAt,
+    ...transitionRunStatus(run, "paused", updatedAt, {
+      paused: true,
+      pauseReason: reason,
+    }),
   };
 }
 
 export function resumeDeliveryRun(run: DeliveryRun, updatedAt: string): DeliveryRun {
   return {
     ...run,
-    status: "running",
-    paused: false,
-    pauseReason: undefined,
-    updatedAt,
+    ...transitionRunStatus(run, "running", updatedAt, {
+      paused: false,
+      pauseReason: undefined,
+    }),
   };
 }
 

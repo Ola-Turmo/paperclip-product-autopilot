@@ -6,6 +6,10 @@ import type {
   ReleaseHealthCheck,
   RollbackAction,
 } from "../types.js";
+import {
+  canTriggerRollback,
+  transitionHealthCheck,
+} from "./state-machines.js";
 
 export function buildCheckpoint(input: {
   checkpointId: string;
@@ -72,13 +76,7 @@ export function updateReleaseHealthCheck(
   updatedAt: string,
   errorMessage?: string,
 ): ReleaseHealthCheck {
-  return {
-    ...check,
-    status,
-    errorMessage,
-    passedAt: status === "passed" ? updatedAt : check.passedAt,
-    failedAt: status === "failed" ? updatedAt : check.failedAt,
-  };
+  return transitionHealthCheck(check, status, updatedAt, errorMessage);
 }
 
 export function buildRollbackAction(input: {
@@ -92,6 +90,12 @@ export function buildRollbackAction(input: {
   targetCommitSha?: string;
   checkpointId?: string;
 }): RollbackAction {
+  if (input.rollbackType === "restore_checkpoint" && !input.checkpointId) {
+    throw new Error("checkpointId is required for restore_checkpoint rollbacks");
+  }
+  if (input.rollbackType === "revert_commit" && !input.targetCommitSha) {
+    throw new Error("targetCommitSha is required for revert_commit rollbacks");
+  }
   return {
     rollbackId: input.rollbackId,
     companyId: input.companyId,
@@ -113,3 +117,5 @@ export function checkpointSummary(checkpoint: Checkpoint): string {
 export function isTerminalRunStatus(status: string): status is Extract<RunStatus, "completed" | "failed" | "cancelled"> {
   return ["completed", "failed", "cancelled"].includes(status);
 }
+
+export { canTriggerRollback };

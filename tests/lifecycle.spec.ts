@@ -4,6 +4,7 @@ import {
   buildReleaseHealthCheck,
   buildRestoredConvoyTask,
   buildRollbackAction,
+  canTriggerRollback,
   checkpointSummary,
   updateReleaseHealthCheck,
 } from "../src/services/lifecycle.js";
@@ -100,5 +101,48 @@ describe("lifecycle services", () => {
     expect(rollback.status).toBe("pending");
     expect(rollback.rollbackType).toBe("restore_checkpoint");
     expect(rollback.checkpointId).toBe("checkpoint-1");
+    expect(canTriggerRollback(updateReleaseHealthCheck(
+      buildReleaseHealthCheck({
+        checkId: "check-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-1",
+        checkType: "smoke_test",
+        name: "Smoke test",
+        createdAt: "2026-01-02T00:00:00.000Z",
+      }),
+      "failed",
+      "2026-01-03T00:00:00.000Z",
+    ))).toBe(true);
+  });
+
+  it("rejects invalid release health and rollback inputs", () => {
+    const check = buildReleaseHealthCheck({
+      checkId: "check-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: "run-1",
+      checkType: "smoke_test",
+      name: "Smoke test",
+      createdAt: "2026-01-02T00:00:00.000Z",
+    });
+
+    const passed = updateReleaseHealthCheck(check, "passed", "2026-01-03T00:00:00.000Z");
+
+    expect(() =>
+      updateReleaseHealthCheck(passed, "failed", "2026-01-04T00:00:00.000Z", "boom"),
+    ).toThrow("Invalid release health transition");
+
+    expect(() =>
+      buildRollbackAction({
+        rollbackId: "rollback-2",
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-1",
+        checkId: "check-1",
+        rollbackType: "restore_checkpoint",
+        createdAt: "2026-01-03T00:00:00.000Z",
+      }),
+    ).toThrow("checkpointId is required");
   });
 });

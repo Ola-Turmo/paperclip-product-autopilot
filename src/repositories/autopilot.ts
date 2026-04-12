@@ -2,10 +2,13 @@ import type { PluginContext } from "@paperclipai/plugin-sdk";
 import {
   getAutopilotProject,
   getCompanyBudget,
+  getDeliveryRun,
   getIdea,
   getPreferenceProfile,
+  listCheckpoints,
   listConvoyTasks,
   listDigests,
+  listReleaseHealthChecks,
   listStuckRuns,
   upsertCheckpoint,
   upsertConvoyTask,
@@ -39,6 +42,7 @@ import type {
 
 export interface AutopilotRepository {
   getAutopilotProject(companyId: string, projectId: string): Promise<AutopilotProject | null>;
+  getDeliveryRun(companyId: string, projectId: string, runId: string): Promise<DeliveryRun | null>;
   getIdea(companyId: string, projectId: string, ideaId: string): Promise<Idea | null>;
   upsertIdea(idea: Idea): Promise<void>;
   upsertSwipeEvent(swipe: SwipeEvent): Promise<void>;
@@ -52,7 +56,9 @@ export interface AutopilotRepository {
   listDigests(companyId: string, projectId: string): Promise<Digest[]>;
   upsertDigest(digest: Digest): Promise<void>;
   listStuckRuns(companyId: string, projectId: string): Promise<DeliveryRun[]>;
+  listCheckpoints(companyId: string, projectId: string, runId?: string): Promise<Checkpoint[]>;
   listConvoyTasks(companyId: string, projectId: string, runId?: string): Promise<ConvoyTask[]>;
+  listReleaseHealthChecks(companyId: string, projectId: string, runId?: string): Promise<ReleaseHealthCheck[]>;
   upsertCheckpoint(checkpoint: Checkpoint): Promise<void>;
   upsertConvoyTask(task: ConvoyTask): Promise<void>;
   upsertReleaseHealthCheck(check: ReleaseHealthCheck): Promise<void>;
@@ -62,6 +68,7 @@ export interface AutopilotRepository {
 export function createAutopilotRepository(ctx: PluginContext): AutopilotRepository {
   return {
     getAutopilotProject: (companyId, projectId) => getAutopilotProject(ctx, companyId, projectId),
+    getDeliveryRun: (companyId, projectId, runId) => getDeliveryRun(ctx, companyId, projectId, runId),
     getIdea: (companyId, projectId, ideaId) => getIdea(ctx, companyId, projectId, ideaId),
     upsertIdea: async (idea) => {
       await upsertIdea(ctx, idea);
@@ -91,7 +98,9 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
       await upsertDigest(ctx, digest);
     },
     listStuckRuns: (companyId, projectId) => listStuckRuns(ctx, companyId, projectId),
+    listCheckpoints: (companyId, projectId, runId) => listCheckpoints(ctx, companyId, projectId, runId),
     listConvoyTasks: (companyId, projectId, runId) => listConvoyTasks(ctx, companyId, projectId, runId),
+    listReleaseHealthChecks: (companyId, projectId, runId) => listReleaseHealthChecks(ctx, companyId, projectId, runId),
     upsertCheckpoint: async (checkpoint) => {
       await upsertCheckpoint(ctx, checkpoint);
     },
