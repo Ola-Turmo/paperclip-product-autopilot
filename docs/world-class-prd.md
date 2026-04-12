@@ -441,9 +441,9 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [x] Make `src/*` the authoritative source tree.
 - [x] Split worker registration into data, actions, tools, and jobs modules.
 - [x] Split action handlers into domain modules.
-- [ ] Move tool handlers into smaller domain modules instead of one file.
-- [ ] Move job handlers into smaller domain modules instead of one file.
-- [ ] Replace remaining direct helper calls in handlers with typed repository usage.
+- [x] Move tool handlers into smaller domain modules instead of one file.
+- [x] Move job handlers into smaller domain modules instead of one file.
+- [~] Replace remaining direct helper calls in handlers with typed repository usage.
 - [~] Expand the repository layer so all major entity access goes through repository interfaces.
 - [ ] Separate pure domain logic from Paperclip adapter logic more aggressively.
 - [ ] Introduce mappers or translators where plugin-facing DTOs and domain entities should diverge.
@@ -590,4 +590,4 @@ This project can credibly claim to be state of the art only when all of the foll
 
 The single best next step is:
 
-- Finish the state-machine rollout by covering digest transitions, remaining handler paths, and invariant enforcement, then continue the repository-layer adoption across the remaining action and tool modules.
+- Finish the state-machine rollout by covering digest transitions, remaining handler paths, and invariant enforcement, then continue the repository-layer adoption across the remaining action and tool modules with stronger tests around those boundaries.

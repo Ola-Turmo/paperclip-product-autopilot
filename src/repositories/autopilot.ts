@@ -5,11 +5,16 @@ import {
   getDeliveryRun,
   getIdea,
   getPreferenceProfile,
+  listAutopilotProjectEntities,
   listCheckpoints,
   listConvoyTasks,
   listDigests,
+  listIdeas,
+  listMaybePoolIdeas,
   listReleaseHealthChecks,
+  listResearchFindings,
   listStuckRuns,
+  upsertAutopilotProject,
   upsertCheckpoint,
   upsertConvoyTask,
   upsertDeliveryRun,
@@ -18,6 +23,7 @@ import {
   upsertPreferenceProfile,
   upsertProductLock,
   upsertReleaseHealthCheck,
+  upsertResearchCycle,
   upsertRollbackAction,
   upsertSwipeEvent,
   upsertWorkspaceLease,
@@ -35,19 +41,28 @@ import type {
   PreferenceProfile,
   ProductLock,
   ReleaseHealthCheck,
+  ResearchCycle,
+  ResearchFinding,
   RollbackAction,
   SwipeEvent,
   WorkspaceLease,
 } from "../types.js";
+import type { IdeaStatus, RunStatus } from "../constants.js";
 
 export interface AutopilotRepository {
+  listAutopilotProjects(companyId?: string): Promise<AutopilotProject[]>;
   getAutopilotProject(companyId: string, projectId: string): Promise<AutopilotProject | null>;
+  upsertAutopilotProject(project: AutopilotProject): Promise<void>;
   getDeliveryRun(companyId: string, projectId: string, runId: string): Promise<DeliveryRun | null>;
   getIdea(companyId: string, projectId: string, ideaId: string): Promise<Idea | null>;
+  listIdeas(companyId: string, projectId: string, status?: IdeaStatus): Promise<Idea[]>;
+  listMaybePoolIdeas(companyId: string, projectId: string): Promise<Idea[]>;
   upsertIdea(idea: Idea): Promise<void>;
   upsertSwipeEvent(swipe: SwipeEvent): Promise<void>;
   getPreferenceProfile(companyId: string, projectId: string): Promise<PreferenceProfile | null>;
   upsertPreferenceProfile(profile: PreferenceProfile): Promise<void>;
+  upsertResearchCycle(cycle: ResearchCycle): Promise<void>;
+  listResearchFindings(companyId: string, projectId: string, cycleId?: string): Promise<ResearchFinding[]>;
   upsertPlanningArtifact(artifact: PlanningArtifact): Promise<void>;
   upsertDeliveryRun(run: DeliveryRun): Promise<void>;
   upsertWorkspaceLease(lease: WorkspaceLease): Promise<void>;
@@ -67,9 +82,18 @@ export interface AutopilotRepository {
 
 export function createAutopilotRepository(ctx: PluginContext): AutopilotRepository {
   return {
+    listAutopilotProjects: async (companyId) => {
+      const entities = await listAutopilotProjectEntities(ctx, companyId);
+      return entities.map((entity) => entity.data as unknown as AutopilotProject);
+    },
     getAutopilotProject: (companyId, projectId) => getAutopilotProject(ctx, companyId, projectId),
+    upsertAutopilotProject: async (project) => {
+      await upsertAutopilotProject(ctx, project);
+    },
     getDeliveryRun: (companyId, projectId, runId) => getDeliveryRun(ctx, companyId, projectId, runId),
     getIdea: (companyId, projectId, ideaId) => getIdea(ctx, companyId, projectId, ideaId),
+    listIdeas: (companyId, projectId, status) => listIdeas(ctx, companyId, projectId, status),
+    listMaybePoolIdeas: (companyId, projectId) => listMaybePoolIdeas(ctx, companyId, projectId),
     upsertIdea: async (idea) => {
       await upsertIdea(ctx, idea);
     },
@@ -80,6 +104,10 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
     upsertPreferenceProfile: async (profile) => {
       await upsertPreferenceProfile(ctx, profile);
     },
+    upsertResearchCycle: async (cycle) => {
+      await upsertResearchCycle(ctx, cycle);
+    },
+    listResearchFindings: (companyId, projectId, cycleId) => listResearchFindings(ctx, companyId, projectId, cycleId),
     upsertPlanningArtifact: async (artifact) => {
       await upsertPlanningArtifact(ctx, artifact);
     },
