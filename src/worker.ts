@@ -129,6 +129,11 @@ import {
   checkpointSummary,
   updateReleaseHealthCheck,
 } from "./services/lifecycle.js";
+import {
+  createBudgetAlertDigest as orchestrateBudgetAlertDigest,
+  createStuckRunDigest as orchestrateStuckRunDigest,
+  processSwipeDecision,
+} from "./services/orchestration.js";
 import { shouldResurfaceIdea } from "./services/resurface.js";
 import {
   applySwipeToIdea,
@@ -1252,130 +1257,6 @@ export function registerToolHandlers(ctx: PluginContext) {
   });
 }
 
-type SwipeDecisionInput = {
-  companyId: string;
-  projectId: string;
-  ideaId: string;
-  decision: SwipeDecision;
-  note?: string;
-};
-
-async function processSwipeDecision(ctx: PluginContext, input: SwipeDecisionInput) {
-  const idea = await getIdea(ctx, input.companyId, input.projectId, input.ideaId);
-  if (!idea) throw new Error("Idea not found");
-
-  const timestamp = nowIso();
-  const swipe = buildSwipeEvent({
-    swipeId: newId(),
-    companyId: input.companyId,
-    projectId: input.projectId,
-    ideaId: input.ideaId,
-    decision: input.decision,
-    note: input.note,
-    createdAt: timestamp,
-  });
-  await upsertSwipeEvent(ctx, swipe);
-
-  const updatedIdea = applySwipeToIdea(idea, input.decision, timestamp);
-  await upsertIdea(ctx, updatedIdea);
-
-  let profile = await getPreferenceProfile(ctx, input.companyId, input.projectId);
-  if (!profile) {
-    profile = createEmptyPreferenceProfile({
-      profileId: newId(),
-      companyId: input.companyId,
-      projectId: input.projectId,
-      lastUpdated: timestamp,
-    });
-  }
-  const updatedProfile = applySwipeToPreferenceProfile(profile, input.decision, idea);
-  await upsertPreferenceProfile(ctx, updatedProfile);
-
-  const autopilot = await getAutopilotProject(ctx, input.companyId, input.projectId);
-  let planningArtifact: PlanningArtifact | undefined;
-  let deliveryRun: DeliveryRun | undefined;
-  let workspaceLease;
-  let productLock;
-
-  if ((input.decision === "yes" || input.decision === "now") && autopilot?.enabled) {
-    const artifactId = newId();
-    planningArtifact = buildPlanningArtifact({
-      artifactId,
-      companyId: input.companyId,
-      projectId: input.projectId,
-      ideaId: input.ideaId,
-      idea,
-      automationTier: autopilot.automationTier,
-      createdAt: timestamp,
-    });
-    await upsertPlanningArtifact(ctx, planningArtifact);
-
-    if (shouldCreateDeliveryRun({
-      decision: input.decision,
-      autopilotEnabled: autopilot.enabled,
-      automationTier: autopilot.automationTier,
-    })) {
-      const runId = newId();
-      const branchName = generateBranchName(input.projectId, input.ideaId);
-      const leasedPort = allocatePort();
-      deliveryRun = buildPendingDeliveryRun({
-        runId,
-        companyId: input.companyId,
-        projectId: input.projectId,
-        ideaId: input.ideaId,
-        artifactId,
-        idea,
-        automationTier: autopilot.automationTier,
-        branchName,
-        workspacePath: autopilot.workspaceId ?? "",
-        leasedPort,
-        createdAt: timestamp,
-      });
-      await upsertDeliveryRun(ctx, deliveryRun);
-
-      workspaceLease = buildWorkspaceLease({
-        leaseId: newId(),
-        companyId: input.companyId,
-        projectId: input.projectId,
-        runId,
-        workspacePath: autopilot.workspaceId ?? "",
-        branchName,
-        leasedPort,
-        gitRepoRoot: autopilot.repoUrl ?? null,
-        createdAt: timestamp,
-      });
-      await upsertWorkspaceLease(ctx, workspaceLease);
-
-      productLock = buildProductLock({
-        lockId: newId(),
-        companyId: input.companyId,
-        projectId: input.projectId,
-        runId,
-        branchName,
-        acquiredAt: timestamp,
-      });
-      await upsertProductLock(ctx, productLock);
-    }
-  }
-
-  await ctx.activity.log({
-    companyId: input.companyId,
-    message: `Swipe ${input.decision} on idea: ${idea.title.slice(0, 60)}`,
-    entityType: "swipe-event",
-    entityId: swipe.swipeId,
-  });
-
-  return {
-    swipe,
-    idea: updatedIdea,
-    profile: updatedProfile,
-    planningArtifact,
-    deliveryRun,
-    workspaceLease,
-    productLock,
-  };
-}
-
 // ─── JOB HANDLERS ──────────────────────────────────────────────────────────────
 export function registerJobHandlers(ctx: PluginContext) {
 
@@ -1475,42 +1356,9 @@ function hasPendingDigest(
 }
 
 async function generateBudgetAlertDigest(ctx: PluginContext, companyId: string, projectId: string): Promise<Digest | undefined> {
-  const budget = await getCompanyBudget(ctx, companyId);
-  if (!budget) return undefined;
-  const digest = buildBudgetAlertDigest({
-    digestId: newId(),
-    companyId,
-    projectId,
-    budget,
-    createdAt: nowIso(),
-  });
-  if (!digest) return undefined;
-
-  const existingDigests = await listDigests(ctx, companyId, projectId);
-  if (hasPendingDigest(existingDigests, "budget_alert", (existing) => existing.relatedBudgetId === digest.relatedBudgetId)) {
-    return undefined;
-  }
-
-  await upsertDigest(ctx, digest);
-  return digest;
+  return await orchestrateBudgetAlertDigest(ctx, companyId, projectId);
 }
 
 async function generateStuckRunDigest(ctx: PluginContext, companyId: string, projectId: string): Promise<Digest | undefined> {
-  const stuckRuns = await listStuckRuns(ctx, companyId, projectId);
-  const digest = buildStuckRunDigest({
-    digestId: newId(),
-    companyId,
-    projectId,
-    stuckRuns,
-    createdAt: nowIso(),
-  });
-  if (!digest) return undefined;
-
-  const existingDigests = await listDigests(ctx, companyId, projectId);
-  if (hasPendingDigest(existingDigests, "stuck_run", (existing) => existing.relatedRunId === digest.relatedRunId)) {
-    return undefined;
-  }
-
-  await upsertDigest(ctx, digest);
-  return digest;
+  return await orchestrateStuckRunDigest(ctx, companyId, projectId);
 }

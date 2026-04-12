@@ -435,6 +435,8 @@ This section replaces phase-based planning. It should be kept current as impleme
 - [x] Add worker integration tests for swipe actions, delivery lifecycle, and maybe-pool resurfacing jobs.
 - [x] Unify the action/tool swipe paths so they create matching downstream state.
 - [x] Deduplicate pending sweep digests so hourly jobs do not spam repeated alerts.
+- [x] Add typed repository and orchestration layers for the main swipe/digest workflows.
+- [x] Add lifecycle builders, validation, and observability for checkpoints, release health, and rollback flows.
 
 ### Next
 
