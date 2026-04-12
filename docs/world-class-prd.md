@@ -437,6 +437,7 @@ This section replaces phase-based planning. It should be kept current as impleme
 - [x] Deduplicate pending sweep digests so hourly jobs do not spam repeated alerts.
 - [x] Add typed repository and orchestration layers for the main swipe/digest workflows.
 - [x] Add lifecycle builders, validation, and observability for checkpoints, release health, and rollback flows.
+- [x] Extract worker data, tool, and job registration into dedicated module files.
 
 ### Next
 

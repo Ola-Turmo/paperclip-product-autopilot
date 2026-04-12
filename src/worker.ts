@@ -135,6 +135,9 @@ import {
   processSwipeDecision,
 } from "./services/orchestration.js";
 import { shouldResurfaceIdea } from "./services/resurface.js";
+import { registerDataHandlers as registerDataHandlersModule } from "./worker/data.js";
+import { registerJobHandlers as registerJobHandlersModule } from "./worker/jobs.js";
+import { registerToolHandlers as registerToolHandlersModule } from "./worker/tools.js";
 import {
   applySwipeToIdea,
   buildSwipeEvent,
@@ -194,10 +197,10 @@ async function recordLifecycleSignals(
 const plugin = definePlugin({
   async setup(ctx: PluginContext) {
     ctx.logger.info(`${PLUGIN_ID} worker starting`);
-    registerDataHandlers(ctx);
+    registerDataHandlersModule(ctx);
     registerActionHandlers(ctx);
-    registerToolHandlers(ctx);
-    registerJobHandlers(ctx);
+    registerToolHandlersModule(ctx);
+    registerJobHandlersModule(ctx);
     ctx.logger.info(`${PLUGIN_ID} handlers registered`);
   },
 
