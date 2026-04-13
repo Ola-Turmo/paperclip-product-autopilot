@@ -1,6 +1,10 @@
 import type { PluginContext } from "@paperclipai/plugin-sdk";
 import {
+  findDuplicateIdea,
+  getActiveProductLock,
+  getActiveWorkspaceLease,
   getAutopilotProject,
+  getLatestProductProgram,
   getCompanyBudget,
   getDeliveryRun,
   getIdea,
@@ -15,11 +19,14 @@ import {
   listKnowledgeEntries,
   listLearnerSummaries,
   listOperatorInterventions,
+  listProductLocks,
   listReleaseHealthChecks,
   listRollbackActions,
+  listResearchCycles,
   listResearchFindings,
   listStuckRuns,
   upsertAutopilotProject,
+  upsertCompanyBudget,
   upsertCheckpoint,
   upsertConvoyTask,
   upsertDeliveryRun,
@@ -29,9 +36,11 @@ import {
   upsertOperatorIntervention,
   upsertPlanningArtifact,
   upsertPreferenceProfile,
+  upsertProductProgramRevision,
   upsertProductLock,
   upsertReleaseHealthCheck,
   upsertResearchCycle,
+  upsertResearchFinding,
   upsertRollbackAction,
   upsertSwipeEvent,
   upsertWorkspaceLease,
@@ -50,6 +59,7 @@ import type {
   OperatorIntervention,
   PlanningArtifact,
   PreferenceProfile,
+  ProductProgramRevision,
   ProductLock,
   ReleaseHealthCheck,
   ResearchCycle,
@@ -64,22 +74,42 @@ export interface AutopilotRepository {
   listAutopilotProjects(companyId?: string): Promise<AutopilotProject[]>;
   getAutopilotProject(companyId: string, projectId: string): Promise<AutopilotProject | null>;
   upsertAutopilotProject(project: AutopilotProject): Promise<void>;
+  getLatestProductProgram(companyId: string, projectId: string): Promise<ProductProgramRevision | null>;
+  upsertProductProgramRevision(revision: ProductProgramRevision): Promise<void>;
   getDeliveryRun(companyId: string, projectId: string, runId: string): Promise<DeliveryRun | null>;
   listDeliveryRuns(companyId: string, projectId: string, status?: RunStatus): Promise<DeliveryRun[]>;
+  getActiveWorkspaceLease(projectId: string, runId: string): Promise<WorkspaceLease | null>;
   getIdea(companyId: string, projectId: string, ideaId: string): Promise<Idea | null>;
   listIdeas(companyId: string, projectId: string, status?: IdeaStatus): Promise<Idea[]>;
   listMaybePoolIdeas(companyId: string, projectId: string): Promise<Idea[]>;
+  findDuplicateIdea(
+    companyId: string,
+    projectId: string,
+    title: string,
+    description: string,
+    excludeIdeaId?: string,
+    options?: {
+      category?: string;
+      tags?: string[];
+      sourceReferences?: string[];
+    },
+  ): Promise<{ idea: Idea; similarity: number; reasons: string[] } | null>;
   upsertIdea(idea: Idea): Promise<void>;
   upsertSwipeEvent(swipe: SwipeEvent): Promise<void>;
   getPreferenceProfile(companyId: string, projectId: string): Promise<PreferenceProfile | null>;
   upsertPreferenceProfile(profile: PreferenceProfile): Promise<void>;
+  listResearchCycles(companyId: string, projectId?: string): Promise<ResearchCycle[]>;
   upsertResearchCycle(cycle: ResearchCycle): Promise<void>;
+  upsertResearchFinding(finding: ResearchFinding): Promise<void>;
   listResearchFindings(companyId: string, projectId: string, cycleId?: string): Promise<ResearchFinding[]>;
   upsertPlanningArtifact(artifact: PlanningArtifact): Promise<void>;
   upsertDeliveryRun(run: DeliveryRun): Promise<void>;
   upsertWorkspaceLease(lease: WorkspaceLease): Promise<void>;
+  getActiveProductLock(projectId: string, targetBranch: string): Promise<ProductLock | null>;
+  listProductLocks(companyId: string, projectId: string): Promise<ProductLock[]>;
   upsertProductLock(lock: ProductLock): Promise<void>;
   getCompanyBudget(companyId: string): Promise<CompanyBudget | null>;
+  upsertCompanyBudget(budget: CompanyBudget): Promise<void>;
   listDigests(companyId: string, projectId: string): Promise<Digest[]>;
   upsertDigest(digest: Digest): Promise<void>;
   listLearnerSummaries(companyId: string, projectId: string): Promise<LearnerSummary[]>;
@@ -109,11 +139,18 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
     upsertAutopilotProject: async (project) => {
       await upsertAutopilotProject(ctx, project);
     },
+    getLatestProductProgram: (companyId, projectId) => getLatestProductProgram(ctx, companyId, projectId),
+    upsertProductProgramRevision: async (revision) => {
+      await upsertProductProgramRevision(ctx, revision);
+    },
     getDeliveryRun: (companyId, projectId, runId) => getDeliveryRun(ctx, companyId, projectId, runId),
     listDeliveryRuns: (companyId, projectId, status) => listDeliveryRuns(ctx, companyId, projectId, status),
+    getActiveWorkspaceLease: (projectId, runId) => getActiveWorkspaceLease(ctx, projectId, runId),
     getIdea: (companyId, projectId, ideaId) => getIdea(ctx, companyId, projectId, ideaId),
     listIdeas: (companyId, projectId, status) => listIdeas(ctx, companyId, projectId, status),
     listMaybePoolIdeas: (companyId, projectId) => listMaybePoolIdeas(ctx, companyId, projectId),
+    findDuplicateIdea: (companyId, projectId, title, description, excludeIdeaId, options) =>
+      findDuplicateIdea(ctx, companyId, projectId, title, description, excludeIdeaId, options),
     upsertIdea: async (idea) => {
       await upsertIdea(ctx, idea);
     },
@@ -124,8 +161,12 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
     upsertPreferenceProfile: async (profile) => {
       await upsertPreferenceProfile(ctx, profile);
     },
+    listResearchCycles: (companyId, projectId) => listResearchCycles(ctx, companyId, projectId),
     upsertResearchCycle: async (cycle) => {
       await upsertResearchCycle(ctx, cycle);
+    },
+    upsertResearchFinding: async (finding) => {
+      await upsertResearchFinding(ctx, finding);
     },
     listResearchFindings: (companyId, projectId, cycleId) => listResearchFindings(ctx, companyId, projectId, cycleId),
     upsertPlanningArtifact: async (artifact) => {
@@ -137,10 +178,15 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
     upsertWorkspaceLease: async (lease) => {
       await upsertWorkspaceLease(ctx, lease);
     },
+    getActiveProductLock: (projectId, targetBranch) => getActiveProductLock(ctx, projectId, targetBranch),
+    listProductLocks: (companyId, projectId) => listProductLocks(ctx, companyId, projectId),
     upsertProductLock: async (lock) => {
       await upsertProductLock(ctx, lock);
     },
     getCompanyBudget: (companyId) => getCompanyBudget(ctx, companyId),
+    upsertCompanyBudget: async (budget) => {
+      await upsertCompanyBudget(ctx, budget);
+    },
     listDigests: (companyId, projectId) => listDigests(ctx, companyId, projectId),
     upsertDigest: async (digest) => {
       await upsertDigest(ctx, digest);

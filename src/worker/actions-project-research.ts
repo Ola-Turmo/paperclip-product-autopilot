@@ -12,20 +12,10 @@ import type {
   ResearchFinding,
 } from "../types.js";
 import {
-  findDuplicateIdea,
-  getAutopilotProject,
-  getIdea,
-  getLatestProductProgram,
-  listResearchCycles,
-  listResearchFindings,
   newId,
   nowIso,
-  upsertAutopilotProject,
-  upsertIdea,
-  upsertProductProgramRevision,
-  upsertResearchCycle,
-  upsertResearchFinding,
 } from "../helpers.js";
+import { createAutopilotRepository } from "../repositories/autopilot.js";
 import { processSwipeDecision } from "../services/orchestration.js";
 import {
   isNonEmptyString,
@@ -37,12 +27,13 @@ import {
 import { transitionIdeaStatus } from "../services/state-machines.js";
 
 export function registerProjectResearchActionHandlers(ctx: PluginContext) {
+  const repo = createAutopilotRepository(ctx);
   ctx.actions.register(ACTION_KEYS.saveAutopilotProject, async (args) => {
     const a = args as Partial<AutopilotProject> & { companyId: string; projectId: string };
     if (!isNonEmptyString(a.companyId)) throw new Error("companyId required");
     if (!isNonEmptyString(a.projectId)) throw new Error("projectId required");
 
-    const existing = await getAutopilotProject(ctx, a.companyId, a.projectId);
+    const existing = await repo.getAutopilotProject(a.companyId, a.projectId);
     const now = nowIso();
     const autopilot: AutopilotProject = {
       autopilotId: existing?.autopilotId ?? newId(),
@@ -66,33 +57,33 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
-    const record = await upsertAutopilotProject(ctx, autopilot);
+    await repo.upsertAutopilotProject(autopilot);
     await ctx.activity.log({
       companyId: a.companyId,
       message: `Autopilot project ${existing ? "updated" : "created"} for project ${a.projectId.slice(0, 8)}`,
       entityType: "autopilot-project",
       entityId: autopilot.autopilotId,
     });
-    return record.data;
+    return autopilot;
   });
 
   ctx.actions.register(ACTION_KEYS.enableAutopilot, async (args) => {
     const resolved = requireCompanyAndProject(args);
     if (typeof resolved === "string") throw new Error(resolved);
-    const existing = await getAutopilotProject(ctx, resolved.companyId, resolved.projectId);
+    const existing = await repo.getAutopilotProject(resolved.companyId, resolved.projectId);
     if (!existing) throw new Error("Autopilot project not found");
     const updated = { ...existing, enabled: true, paused: false, updatedAt: nowIso() };
-    await upsertAutopilotProject(ctx, updated);
+    await repo.upsertAutopilotProject(updated);
     return updated;
   });
 
   ctx.actions.register(ACTION_KEYS.disableAutopilot, async (args) => {
     const resolved = requireCompanyAndProject(args);
     if (typeof resolved === "string") throw new Error(resolved);
-    const existing = await getAutopilotProject(ctx, resolved.companyId, resolved.projectId);
+    const existing = await repo.getAutopilotProject(resolved.companyId, resolved.projectId);
     if (!existing) throw new Error("Autopilot project not found");
     const updated = { ...existing, enabled: false, updatedAt: nowIso() };
-    await upsertAutopilotProject(ctx, updated);
+    await repo.upsertAutopilotProject(updated);
     return updated;
   });
 
@@ -102,7 +93,7 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
     if (!isNonEmptyString(a.projectId)) throw new Error("projectId required");
     if (!isNonEmptyString(a.content)) throw new Error("content required");
 
-    const existing = await getLatestProductProgram(ctx, a.companyId, a.projectId);
+    const existing = await repo.getLatestProductProgram(a.companyId, a.projectId);
     const version = (existing?.version ?? 0) + 1;
     const now = nowIso();
     const revision: ProductProgramRevision = {
@@ -114,20 +105,20 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       createdAt: now,
       updatedAt: now,
     };
-    const record = await upsertProductProgramRevision(ctx, revision);
+    await repo.upsertProductProgramRevision(revision);
     await ctx.activity.log({
       companyId: a.companyId,
       message: `Product Program v${version} created for project ${a.projectId.slice(0, 8)}`,
       entityType: "product-program-revision",
       entityId: revision.revisionId,
     });
-    return record.data;
+    return revision;
   });
 
   ctx.actions.register(ACTION_KEYS.getLatestProductProgram, async (args) => {
     const resolved = requireCompanyAndProject(args);
     if (typeof resolved === "string") throw new Error(resolved);
-    return (await getLatestProductProgram(ctx, resolved.companyId, resolved.projectId)) ?? undefined;
+    return (await repo.getLatestProductProgram(resolved.companyId, resolved.projectId)) ?? undefined;
   });
 
   ctx.actions.register(ACTION_KEYS.startResearchCycle, async (args) => {
@@ -144,7 +135,7 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       findingsCount: 0,
       startedAt: nowIso(),
     };
-    await upsertResearchCycle(ctx, cycle);
+    await repo.upsertResearchCycle(cycle);
     await ctx.activity.log({
       companyId: a.companyId,
       message: `Research cycle started: ${cycle.query.slice(0, 60)}`,
@@ -156,11 +147,11 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
 
   ctx.actions.register(ACTION_KEYS.completeResearchCycle, async (args) => {
     const a = args as { companyId: string; projectId: string; cycleId: string; reportContent?: string };
-    const cycles = await listResearchCycles(ctx, a.companyId, a.projectId);
+    const cycles = await repo.listResearchCycles(a.companyId, a.projectId);
     const cycle = cycles.find((candidate) => candidate.cycleId === a.cycleId);
     if (!cycle) throw new Error("Research cycle not found");
 
-    const findings = await listResearchFindings(ctx, a.companyId, a.projectId, a.cycleId);
+    const findings = await repo.listResearchFindings(a.companyId, a.projectId, a.cycleId);
     const updated: ResearchCycle = {
       ...cycle,
       status: "completed",
@@ -168,7 +159,7 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       findingsCount: findings.length,
       completedAt: nowIso(),
     };
-    await upsertResearchCycle(ctx, updated);
+    await repo.upsertResearchCycle(updated);
     return updated;
   });
 
@@ -197,7 +188,7 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       category: a.category,
       createdAt: nowIso(),
     };
-    await upsertResearchFinding(ctx, finding);
+    await repo.upsertResearchFinding(finding);
     return finding;
   });
 
@@ -218,7 +209,7 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
     if (!isNonEmptyString(a.projectId)) throw new Error("projectId required");
     if (!isNonEmptyString(a.title)) throw new Error("title required");
 
-    const duplicate = await findDuplicateIdea(ctx, a.companyId, a.projectId, a.title, a.description ?? "");
+    const duplicate = await repo.findDuplicateIdea(a.companyId, a.projectId, a.title, a.description ?? "");
     const idea: Idea = {
       ideaId: newId(),
       companyId: a.companyId,
@@ -238,7 +229,7 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       createdAt: nowIso(),
       updatedAt: nowIso(),
     };
-    await upsertIdea(ctx, idea);
+    await repo.upsertIdea(idea);
     await ctx.activity.log({
       companyId: a.companyId,
       message: `Idea created: ${a.title.slice(0, 60)}`,
@@ -250,12 +241,12 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
 
   ctx.actions.register(ACTION_KEYS.updateIdea, async (args) => {
     const a = args as { companyId: string; projectId: string; ideaId: string; status?: IdeaStatus };
-    const idea = await getIdea(ctx, a.companyId, a.projectId, a.ideaId);
+    const idea = await repo.getIdea(a.companyId, a.projectId, a.ideaId);
     if (!idea) throw new Error("Idea not found");
     const updated: Idea = a.status
       ? transitionIdeaStatus(idea, a.status, nowIso())
       : { ...idea, updatedAt: nowIso() };
-    await upsertIdea(ctx, updated);
+    await repo.upsertIdea(updated);
     return updated;
   });
 

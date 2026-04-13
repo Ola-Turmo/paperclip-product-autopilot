@@ -15,24 +15,10 @@ import type {
 import {
   allocatePort,
   generateBranchName,
-  getActiveProductLock,
-  getActiveWorkspaceLease,
-  getAutopilotProject,
-  getCompanyBudget,
-  getDeliveryRun,
-  getIdea,
-  listConvoyTasks,
-  listProductLocks,
   newId,
   nowIso,
-  upsertAutopilotProject,
-  upsertCompanyBudget,
-  upsertConvoyTask,
-  upsertDeliveryRun,
-  upsertPlanningArtifact,
-  upsertProductLock,
-  upsertWorkspaceLease,
 } from "../helpers.js";
+import { createAutopilotRepository } from "../repositories/autopilot.js";
 import {
   buildPendingDeliveryRun,
   buildPlanningArtifact,
@@ -55,6 +41,7 @@ import {
 } from "./action-utils.js";
 
 export function registerDeliveryActionHandlers(ctx: PluginContext) {
+  const repo = createAutopilotRepository(ctx);
   ctx.actions.register(ACTION_KEYS.createPlanningArtifact, async (args) => {
     const a = args as {
       companyId: string;
@@ -70,9 +57,9 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       executionMode?: Idea["complexityEstimate"];
       approvalMode?: "manual" | "auto_approve";
     };
-    const idea = await getIdea(ctx, a.companyId, a.projectId, a.ideaId);
+    const idea = await repo.getIdea(a.companyId, a.projectId, a.ideaId);
     if (!idea) throw new Error("Idea not found");
-    const autopilot = await getAutopilotProject(ctx, a.companyId, a.projectId);
+    const autopilot = await repo.getAutopilotProject(a.companyId, a.projectId);
     const artifact = buildPlanningArtifact({
       artifactId: newId(),
       companyId: a.companyId,
@@ -90,7 +77,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       approvalChecklist: a.approvalChecklist,
       approvalMode: a.approvalMode,
     });
-    await upsertPlanningArtifact(ctx, artifact);
+    await repo.upsertPlanningArtifact(artifact);
     return artifact;
   });
 
@@ -103,13 +90,13 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       title?: string;
       automationTier?: AutomationTier;
     };
-    const idea = await getIdea(ctx, a.companyId, a.projectId, a.ideaId);
+    const idea = await repo.getIdea(a.companyId, a.projectId, a.ideaId);
     if (!idea) throw new Error("Idea not found");
     if (idea.status !== "approved" && idea.status !== "in_progress") {
       throw new Error(`Delivery run requires an approved idea, got ${idea.status}`);
     }
 
-    const autopilot = await getAutopilotProject(ctx, a.companyId, a.projectId);
+    const autopilot = await repo.getAutopilotProject(a.companyId, a.projectId);
     const runId = newId();
     const branchName = generateBranchName(a.projectId, a.ideaId);
     const port = allocatePort();
@@ -129,7 +116,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       createdAt,
       title: a.title,
     });
-    await upsertDeliveryRun(ctx, run);
+    await repo.upsertDeliveryRun(run);
 
     const lease = buildWorkspaceLease({
       leaseId: newId(),
@@ -142,7 +129,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       gitRepoRoot: autopilot?.repoUrl ?? null,
       createdAt,
     });
-    await upsertWorkspaceLease(ctx, lease);
+    await repo.upsertWorkspaceLease(lease);
 
     const lock = buildProductLock({
       lockId: newId(),
@@ -152,7 +139,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       branchName,
       acquiredAt: createdAt,
     });
-    await upsertProductLock(ctx, lock);
+    await repo.upsertProductLock(lock);
 
     await ctx.activity.log({
       companyId: a.companyId,
@@ -173,7 +160,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       prUrl?: string;
       error?: string;
     };
-    const run = await getDeliveryRun(ctx, a.companyId, a.projectId, a.runId);
+    const run = await repo.getDeliveryRun(a.companyId, a.projectId, a.runId);
     if (!run) throw new Error("Delivery run not found");
 
     const updated = updateDeliveryRunStatus({
@@ -184,17 +171,17 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       error: a.error,
       updatedAt: nowIso(),
     });
-    await upsertDeliveryRun(ctx, updated);
+    await repo.upsertDeliveryRun(updated);
 
     if (shouldReleaseRunResources(a.status)) {
-      const lease = await getActiveWorkspaceLease(ctx, a.projectId, a.runId);
+      const lease = await repo.getActiveWorkspaceLease(a.projectId, a.runId);
       if (lease) {
-        await upsertWorkspaceLease(ctx, buildReleasedLease(lease, nowIso()));
+        await repo.upsertWorkspaceLease(buildReleasedLease(lease, nowIso()));
       }
-      const locks = await listProductLocks(ctx, a.companyId, a.projectId);
+      const locks = await repo.listProductLocks(a.companyId, a.projectId);
       const activeLock = locks.find((candidate) => candidate.runId === a.runId && candidate.isActive);
       if (activeLock) {
-        await upsertProductLock(ctx, buildReleasedLock(activeLock, nowIso()));
+        await repo.upsertProductLock(buildReleasedLock(activeLock, nowIso()));
       }
     }
 
@@ -203,26 +190,26 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
 
   ctx.actions.register(ACTION_KEYS.pauseDeliveryRun, async (args) => {
     const a = args as { companyId: string; projectId: string; runId: string; reason?: string };
-    const run = await getDeliveryRun(ctx, a.companyId, a.projectId, a.runId);
+    const run = await repo.getDeliveryRun(a.companyId, a.projectId, a.runId);
     if (!run) throw new Error("Delivery run not found");
     const updated = buildPausedRun(run, nowIso(), a.reason);
-    await upsertDeliveryRun(ctx, updated);
+    await repo.upsertDeliveryRun(updated);
     return updated;
   });
 
   ctx.actions.register(ACTION_KEYS.resumeDeliveryRun, async (args) => {
     const a = args as { companyId: string; projectId: string; runId: string };
-    const run = await getDeliveryRun(ctx, a.companyId, a.projectId, a.runId);
+    const run = await repo.getDeliveryRun(a.companyId, a.projectId, a.runId);
     if (!run) throw new Error("Delivery run not found");
     const updated = buildResumedRun(run, nowIso());
-    await upsertDeliveryRun(ctx, updated);
+    await repo.upsertDeliveryRun(updated);
     return updated;
   });
 
   ctx.actions.register(ACTION_KEYS.updateCompanyBudget, async (args) => {
     const a = args as { companyId: string; autopilotUsedMinutes?: number; autopilotBudgetMinutes?: number };
     if (!isNonEmptyString(a.companyId)) throw new Error("companyId required");
-    const existing = await getCompanyBudget(ctx, a.companyId);
+    const existing = await repo.getCompanyBudget(a.companyId);
     const budget: CompanyBudget = {
       budgetId: existing?.budgetId ?? newId(),
       companyId: a.companyId,
@@ -234,15 +221,15 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       pauseReason: existing?.pauseReason,
       updatedAt: nowIso(),
     };
-    await upsertCompanyBudget(ctx, budget);
+    await repo.upsertCompanyBudget(budget);
     return budget;
   });
 
   ctx.actions.register(ACTION_KEYS.checkBudgetAndPauseIfNeeded, async (args) => {
     const resolved = requireCompanyAndProject(args);
     if (typeof resolved === "string") throw new Error(resolved);
-    const budget = await getCompanyBudget(ctx, resolved.companyId);
-    const autopilot = await getAutopilotProject(ctx, resolved.companyId, resolved.projectId);
+    const budget = await repo.getCompanyBudget(resolved.companyId);
+    const autopilot = await repo.getAutopilotProject(resolved.companyId, resolved.projectId);
     if (!autopilot) return { paused: false, reason: undefined };
 
     if (shouldPauseForBudget(autopilot, budget)) {
@@ -252,7 +239,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
         pauseReason: "Budget exhausted",
         updatedAt: nowIso(),
       };
-      await upsertAutopilotProject(ctx, updated);
+      await repo.upsertAutopilotProject(updated);
       return { paused: true, reason: "Budget exhausted" };
     }
 
@@ -284,7 +271,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       updatedAt: nowIso(),
     }));
     for (const task of tasks) {
-      await upsertConvoyTask(ctx, task);
+      await repo.upsertConvoyTask(task);
     }
     return tasks;
   });
@@ -293,13 +280,13 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
     const a = args as { companyId: string; projectId: string; taskId: string; status: ConvoyTaskStatus; error?: string };
     if (!isConvoyTaskStatus(a.status)) throw new Error("Invalid convoy task status");
 
-    const tasks = await listConvoyTasks(ctx, a.companyId, a.projectId);
+    const tasks = await repo.listConvoyTasks(a.companyId, a.projectId);
     const task = tasks.find((candidate) => candidate.taskId === a.taskId);
     if (!task) throw new Error("Convoy task not found");
 
     const now = nowIso();
     const updated: ConvoyTask = transitionConvoyTask(task, a.status, now, a.error);
-    await upsertConvoyTask(ctx, updated);
+    await repo.upsertConvoyTask(updated);
 
     if (a.status === "passed") {
       for (const candidate of tasks) {
@@ -309,7 +296,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
             return dependency?.status === "passed" || dependency?.status === "skipped";
           });
           if (allMet) {
-            await upsertConvoyTask(ctx, { ...candidate, status: "pending", updatedAt: now });
+            await repo.upsertConvoyTask({ ...candidate, status: "pending", updatedAt: now });
           }
         }
       }
@@ -328,7 +315,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       targetPath?: string;
       blockReason?: string;
     };
-    const existing = await getActiveProductLock(ctx, a.projectId, a.targetBranch);
+    const existing = await repo.getActiveProductLock(a.projectId, a.targetBranch);
     if (existing) throw new Error(`Branch ${a.targetBranch} is already locked`);
 
     const lock: ProductLock = {
@@ -344,16 +331,16 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       isActive: true,
       blockReason: a.blockReason,
     };
-    await upsertProductLock(ctx, lock);
+    await repo.upsertProductLock(lock);
     return lock;
   });
 
   ctx.actions.register(ACTION_KEYS.releaseProductLock, async (args) => {
     const a = args as { companyId: string; projectId: string; runId: string };
-    const locks = await listProductLocks(ctx, a.companyId, a.projectId);
+    const locks = await repo.listProductLocks(a.companyId, a.projectId);
     const lock = locks.find((candidate) => candidate.runId === a.runId && candidate.isActive);
     if (!lock) throw new Error("No active lock found for this run");
-    await upsertProductLock(ctx, { ...lock, isActive: false, releasedAt: nowIso() });
+    await repo.upsertProductLock({ ...lock, isActive: false, releasedAt: nowIso() });
     return lock;
   });
 }

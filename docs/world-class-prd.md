@@ -549,7 +549,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 
 - [x] Add unit and integration coverage for the current baseline.
 - [ ] Add transition-matrix tests for state machines.
-- [ ] Add repository contract tests.
+- [x] Add repository contract tests.
 - [ ] Add UI smoke tests.
 - [ ] Add more worker integration tests around rollback, checkpoint restore, release-health aggregation, and digest escalation.
 - [ ] Add fixture-driven tests for ranking and duplicate detection.
