@@ -22,6 +22,7 @@ import type {
   RollbackAction,
   ResearchCycle,
 } from "../types.js";
+import { buildRunAuditTimeline } from "../services/audit.js";
 import { getIdeationBenchmarkSummary } from "../services/evaluation-fixtures.js";
 import { classifyFailureMessage, formatFailureCategory } from "../services/failure-taxonomy.js";
 
@@ -481,14 +482,6 @@ function EvaluationCard() {
   );
 }
 
-type TimelineEvent = {
-  id: string;
-  at: string;
-  title: string;
-  detail: string;
-  status: string;
-};
-
 function AuditTimeline(props: {
   run: DeliveryRun;
   checks: ReleaseHealthCheck[];
@@ -497,56 +490,7 @@ function AuditTimeline(props: {
   rollbacks: RollbackAction[];
   digests: Digest[];
 }) {
-  const events: TimelineEvent[] = [
-    {
-      id: `run-created-${props.run.runId}`,
-      at: props.run.createdAt,
-      title: "Run created",
-      detail: props.run.title,
-      status: props.run.status,
-    },
-    ...props.checkpoints.map((checkpoint) => ({
-      id: checkpoint.checkpointId,
-      at: checkpoint.createdAt,
-      title: "Checkpoint created",
-      detail: checkpoint.label ?? checkpoint.checkpointId,
-      status: "paused",
-    })),
-    ...props.checks.map((check) => ({
-      id: check.checkId,
-      at: check.failedAt ?? check.passedAt ?? check.createdAt,
-      title: `Health check: ${check.name}`,
-      detail: [
-        check.errorMessage ?? check.checkType,
-        formatFailureCategory(classifyFailureMessage(check.errorMessage)),
-      ].filter(Boolean).join(" | "),
-      status: check.status,
-    })),
-    ...props.rollbacks.map((rollback) => ({
-      id: rollback.rollbackId,
-      at: rollback.completedAt ?? rollback.createdAt,
-      title: `Rollback: ${rollback.rollbackType}`,
-      detail: [
-        rollback.errorMessage ?? rollback.status,
-        formatFailureCategory(classifyFailureMessage(rollback.errorMessage)),
-      ].filter(Boolean).join(" | "),
-      status: rollback.status,
-    })),
-    ...props.interventions.map((intervention) => ({
-      id: intervention.interventionId,
-      at: intervention.createdAt,
-      title: `Operator ${intervention.interventionType.replace(/_/g, " ")}`,
-      detail: intervention.note ?? "No note",
-      status: "active",
-    })),
-    ...props.digests.map((digest) => ({
-      id: digest.digestId,
-      at: digest.dismissedAt ?? digest.readAt ?? digest.deliveredAt ?? digest.createdAt,
-      title: `Digest: ${digest.digestType}`,
-      detail: digest.summary,
-      status: digest.status,
-    })),
-  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  const events = buildRunAuditTimeline(props);
 
   return (
     <Section title="Audit Timeline">
