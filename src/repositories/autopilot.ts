@@ -12,6 +12,7 @@ import {
   listIdeas,
   listMaybePoolIdeas,
   listKnowledgeEntries,
+  listLearnerSummaries,
   listOperatorInterventions,
   listReleaseHealthChecks,
   listRollbackActions,
@@ -79,6 +80,7 @@ export interface AutopilotRepository {
   getCompanyBudget(companyId: string): Promise<CompanyBudget | null>;
   listDigests(companyId: string, projectId: string): Promise<Digest[]>;
   upsertDigest(digest: Digest): Promise<void>;
+  listLearnerSummaries(companyId: string, projectId: string): Promise<LearnerSummary[]>;
   upsertLearnerSummary(summary: LearnerSummary): Promise<void>;
   upsertKnowledgeEntry(entry: KnowledgeEntry): Promise<void>;
   upsertOperatorIntervention(intervention: OperatorIntervention): Promise<void>;
@@ -140,6 +142,7 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
     upsertDigest: async (digest) => {
       await upsertDigest(ctx, digest);
     },
+    listLearnerSummaries: (companyId, projectId) => listLearnerSummaries(ctx, companyId, projectId),
     upsertLearnerSummary: async (summary) => {
       await upsertLearnerSummary(ctx, summary);
     },

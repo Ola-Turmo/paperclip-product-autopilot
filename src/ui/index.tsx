@@ -17,6 +17,8 @@ import type {
   DeliveryRun,
   Digest,
   Idea,
+  KnowledgeEntry,
+  LearnerSummary,
   OperatorIntervention,
   ReleaseHealthCheck,
   RollbackAction,
@@ -440,6 +442,65 @@ function DigestsCard(props: { companyId: string; projectId: string; onRefresh: (
   );
 }
 
+function LearningCard(props: { companyId: string; projectId: string }) {
+  const { data: summaries } = usePluginData<LearnerSummary[]>(DATA_KEYS.learnerSummaries, {
+    companyId: props.companyId,
+    projectId: props.projectId,
+  });
+  const { data: knowledge } = usePluginData<KnowledgeEntry[]>(DATA_KEYS.knowledgeEntries, {
+    companyId: props.companyId,
+    projectId: props.projectId,
+  });
+
+  return (
+    <Section title="Learning Loop">
+      <div style={{ display: "grid", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Recent Learner Summaries</div>
+          {!summaries || summaries.length === 0 ? (
+            <div style={MUTED}>No learner summaries yet.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {summaries.slice(0, 3).map((summary) => (
+                <div key={summary.summaryId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+                  <div style={{ fontWeight: 700, color: "#0f172a" }}>{summary.title}</div>
+                  <div style={{ ...MUTED, marginTop: 6 }}>{summary.summaryText}</div>
+                  {summary.keyLearnings.length ? (
+                    <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                      Learnings: {summary.keyLearnings.slice(0, 3).join(" | ")}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Reusable Knowledge</div>
+          {!knowledge || knowledge.length === 0 ? (
+            <div style={MUTED}>No reusable knowledge entries yet.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {knowledge.slice(0, 4).map((entry) => (
+                <div key={entry.entryId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                    <div style={{ fontWeight: 700, color: "#0f172a" }}>{entry.title}</div>
+                    <div style={MUTED}>{entry.knowledgeType}</div>
+                  </div>
+                  <div style={{ ...MUTED, marginTop: 6 }}>{entry.content.slice(0, 180)}</div>
+                  <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                    Used {entry.usageCount} time(s)
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 function EvaluationCard() {
   const summary = getIdeationBenchmarkSummary();
 
@@ -543,6 +604,7 @@ export function AutopilotProjectTab({ context }: PluginDetailTabProps) {
       <ProjectSettingsCard companyId={companyId} projectId={projectId} project={project} onSaved={refreshAll} />
       <ResearchCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
       <EvaluationCard />
+      <LearningCard companyId={companyId} projectId={projectId} />
       <DigestsCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
       <IdeasCard companyId={companyId} projectId={projectId} />
       <RunsCard companyId={companyId} projectId={projectId} />
@@ -686,6 +748,14 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
   });
+  const { data: summaries } = usePluginData<LearnerSummary[]>(DATA_KEYS.learnerSummaries, {
+    companyId: context.companyId,
+    projectId: context.projectId ?? "",
+  });
+  const { data: knowledge } = usePluginData<KnowledgeEntry[]>(DATA_KEYS.knowledgeEntries, {
+    companyId: context.companyId,
+    projectId: context.projectId ?? "",
+  });
 
   if (!run) {
     return <div style={PAGE}>Loading run details...</div>;
@@ -746,6 +816,33 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
             ))}
           </div>
         )}
+      </Section>
+      <Section title="Learning and Reuse">
+        {!summaries || summaries.filter((summary) => summary.runId === run.runId).length === 0 ? (
+          <div style={MUTED}>No learner summaries recorded for this run.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {summaries.filter((summary) => summary.runId === run.runId).slice(0, 3).map((summary) => (
+              <div key={summary.summaryId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+                <div style={{ fontWeight: 700, color: "#0f172a" }}>{summary.title}</div>
+                <div style={{ ...MUTED, marginTop: 6 }}>{summary.summaryText}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {knowledge && knowledge.some((entry) => entry.sourceRunId === run.runId) ? (
+          <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+            {knowledge.filter((entry) => entry.sourceRunId === run.runId).slice(0, 3).map((entry) => (
+              <div key={entry.entryId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ fontWeight: 700, color: "#0f172a" }}>{entry.title}</div>
+                  <div style={MUTED}>{entry.knowledgeType}</div>
+                </div>
+                <div style={{ ...MUTED, marginTop: 6 }}>{entry.content.slice(0, 180)}</div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </Section>
       <AuditTimeline
         run={run}

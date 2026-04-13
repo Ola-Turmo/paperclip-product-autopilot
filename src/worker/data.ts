@@ -7,7 +7,6 @@ import {
   getLatestProductProgram,
   getPlanningArtifact,
   listDeliveryRuns,
-  listLearnerSummaries,
   listPlanningArtifacts,
   listProductLocks,
   listProductProgramRevisions,
@@ -152,7 +151,7 @@ export function registerDataHandlers(ctx: PluginContext) {
 
   ctx.data.register(DATA_KEYS.learnerSummaries, async (args) => {
     const { companyId, projectId } = args as { companyId: string; projectId: string };
-    return await listLearnerSummaries(ctx, companyId, projectId);
+    return await repo.listLearnerSummaries(companyId, projectId);
   });
 
   ctx.data.register(DATA_KEYS.knowledgeEntries, async (args) => {
