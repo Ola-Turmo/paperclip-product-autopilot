@@ -4,9 +4,6 @@ import type { ReleaseHealthCheck, RollbackAction } from "../types.js";
 import { newId, nowIso } from "../helpers.js";
 import { createAutopilotRepository } from "../repositories/autopilot.js";
 import {
-  upsertConvoyTask,
-} from "../helpers.js";
-import {
   buildCheckpoint,
   buildReleaseHealthCheck,
   buildRestoredConvoyTask,
@@ -62,7 +59,7 @@ export function registerLifecycleActionHandlers(ctx: PluginContext) {
       const tasks = await repo.listConvoyTasks(a.companyId, a.projectId, a.runId);
       const task = tasks.find((candidate) => candidate.taskId === taskId);
       if (task) {
-        await upsertConvoyTask(ctx, buildRestoredConvoyTask(task, status as ConvoyTaskStatus, nowIso()));
+        await repo.upsertConvoyTask(buildRestoredConvoyTask(task, status as ConvoyTaskStatus, nowIso()));
       }
     }
     await recordLifecycleSignals(ctx, "checkpoint_restored", a.companyId, "checkpoint.restored", 1, {

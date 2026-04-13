@@ -2,7 +2,7 @@ import type { PluginContext, ToolResult } from "@paperclipai/plugin-sdk";
 import { TOOL_KEYS } from "../constants.js";
 import type { SwipeDecision } from "../constants.js";
 import type { Idea } from "../types.js";
-import { findDuplicateIdea, newId, nowIso } from "../helpers.js";
+import { newId, nowIso } from "../helpers.js";
 import { createAutopilotRepository } from "../repositories/autopilot.js";
 import { buildIdeaDraftFromFinding, rankFindingsForIdeation } from "../services/ideation.js";
 import { processSwipeDecision } from "../services/orchestration.js";
@@ -34,7 +34,7 @@ export function registerIdeaToolHandlers(ctx: PluginContext) {
     },
   }, async (params, _runCtx): Promise<ToolResult> => {
     const a = params as { companyId: string; projectId: string; title: string; description?: string; rationale?: string; sourceReferences?: string[]; impactScore?: number };
-    const duplicate = await findDuplicateIdea(ctx, a.companyId, a.projectId, a.title, a.description ?? "", undefined, {
+    const duplicate = await repo.findDuplicateIdea(a.companyId, a.projectId, a.title, a.description ?? "", undefined, {
       sourceReferences: a.sourceReferences,
     });
     const idea: Idea = {
@@ -153,7 +153,7 @@ export function registerIdeaToolHandlers(ctx: PluginContext) {
         profile,
         outcomeSignals,
       });
-      const duplicate = await findDuplicateIdea(ctx, a.companyId, a.projectId, idea.title, idea.description, undefined, {
+      const duplicate = await repo.findDuplicateIdea(a.companyId, a.projectId, idea.title, idea.description, undefined, {
         category: idea.category,
         tags: idea.tags,
         sourceReferences: idea.sourceReferences,

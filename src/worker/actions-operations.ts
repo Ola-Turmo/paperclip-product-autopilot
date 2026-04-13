@@ -7,11 +7,7 @@ import type {
   LearnerSummary,
   OperatorIntervention,
 } from "../types.js";
-import {
-  listStuckRuns,
-  newId,
-  nowIso,
-} from "../helpers.js";
+import { newId, nowIso } from "../helpers.js";
 import { createAutopilotRepository } from "../repositories/autopilot.js";
 import {
   createBudgetAlertDigest,
@@ -187,6 +183,6 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
   ctx.actions.register(ACTION_KEYS.checkStuckRuns, async (args) => {
     const resolved = requireCompanyAndProject(args);
     if (typeof resolved === "string") throw new Error(resolved);
-    return await listStuckRuns(ctx, resolved.companyId, resolved.projectId);
+    return await repo.listStuckRuns(resolved.companyId, resolved.projectId);
   });
 }
