@@ -9,6 +9,7 @@ import {
   buildWorkspaceLease,
   shouldCreateDeliveryRun,
 } from "./delivery.js";
+import { hasPendingDigestForCandidate } from "./digest-policy.js";
 import { createBudgetAlertDigest as buildBudgetAlertDigest, createStuckRunDigest as buildStuckRunDigest } from "./policy.js";
 import {
   applySwipeToIdea,
@@ -153,12 +154,7 @@ export async function createBudgetAlertDigest(ctx: PluginContext, companyId: str
   if (!digest) return undefined;
 
   const existingDigests = await repo.listDigests(companyId, projectId);
-  const duplicate = existingDigests.some(
-    (existing) =>
-      existing.digestType === "budget_alert" &&
-      existing.status === "pending" &&
-      existing.relatedBudgetId === digest.relatedBudgetId,
-  );
+  const duplicate = hasPendingDigestForCandidate(existingDigests, digest);
   if (duplicate) return undefined;
 
   await repo.upsertDigest(digest);
@@ -178,12 +174,7 @@ export async function createStuckRunDigest(ctx: PluginContext, companyId: string
   if (!digest) return undefined;
 
   const existingDigests = await repo.listDigests(companyId, projectId);
-  const duplicate = existingDigests.some(
-    (existing) =>
-      existing.digestType === "stuck_run" &&
-      existing.status === "pending" &&
-      existing.relatedRunId === digest.relatedRunId,
-  );
+  const duplicate = hasPendingDigestForCandidate(existingDigests, digest);
   if (duplicate) return undefined;
 
   await repo.upsertDigest(digest);

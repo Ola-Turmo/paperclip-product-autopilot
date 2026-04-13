@@ -25,7 +25,7 @@ import type {
   ResearchCycle,
 } from "../types.js";
 import { buildRunAuditTimeline } from "../services/audit.js";
-import { getIdeationBenchmarkSummary } from "../services/evaluation-fixtures.js";
+import { getDigestPolicyBenchmarkSummary, getIdeationBenchmarkSummary, getQualityScorecardSummary } from "../services/evaluation-fixtures.js";
 import { classifyFailureMessage, formatFailureCategory } from "../services/failure-taxonomy.js";
 
 const PAGE: CSSProperties = { display: "grid", gap: 16, padding: 20 };
@@ -503,6 +503,8 @@ function LearningCard(props: { companyId: string; projectId: string }) {
 
 function EvaluationCard() {
   const summary = getIdeationBenchmarkSummary();
+  const digestSummary = getDigestPolicyBenchmarkSummary();
+  const qualityScorecard = getQualityScorecardSummary();
 
   return (
     <Section title="Evaluation Scorecard">
@@ -524,6 +526,18 @@ function EvaluationCard() {
             {summary.meanReciprocalRank.toFixed(2)}
           </div>
           <div style={MUTED}>Mean Reciprocal Rank</div>
+        </div>
+        <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
+            {Math.round(digestSummary.accuracy * 100)}%
+          </div>
+          <div style={MUTED}>Digest Policy Accuracy</div>
+        </div>
+        <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
+            {Math.round(qualityScorecard.overallScore * 100)}%
+          </div>
+          <div style={MUTED}>Overall Quality Score</div>
         </div>
       </div>
       <div style={{ display: "grid", gap: 8, marginTop: 12 }}>

@@ -1,6 +1,10 @@
 import type { PreferenceProfile, ResearchFinding } from "../types.js";
+import type { Digest } from "../types.js";
 import type { IdeationReplayCase } from "./evaluation.js";
 import { evaluateIdeationReplay } from "./evaluation.js";
+import type { DigestPolicyReplayCase } from "./policy-evaluation.js";
+import { evaluateDigestPolicyReplay } from "./policy-evaluation.js";
+import { buildQualityScorecard } from "./quality-scorecard.js";
 
 function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFinding {
   return {
@@ -74,4 +78,70 @@ export const ideationBenchmarkCases: IdeationReplayCase[] = [
 
 export function getIdeationBenchmarkSummary() {
   return evaluateIdeationReplay(ideationBenchmarkCases);
+}
+
+function createDigest(overrides: Partial<Digest> = {}): Digest {
+  return {
+    digestId: "digest-1",
+    companyId: "benchmark-company",
+    projectId: "benchmark-project",
+    digestType: "stuck_run",
+    title: "Run stuck",
+    summary: "Run has not updated",
+    details: [],
+    priority: "high",
+    status: "pending",
+    deliveredAt: null,
+    readAt: null,
+    dismissedAt: null,
+    relatedRunId: "run-1",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+export const digestPolicyBenchmarkCases: DigestPolicyReplayCase[] = [
+  {
+    caseId: "dedupe-stuck-run",
+    existingDigests: [createDigest({ digestId: "existing-1", relatedRunId: "run-1" })],
+    candidateDigest: createDigest({ digestId: "candidate-1", relatedRunId: "run-1" }),
+    expectedCreate: false,
+  },
+  {
+    caseId: "new-stuck-run",
+    existingDigests: [createDigest({ digestId: "existing-2", relatedRunId: "run-1" })],
+    candidateDigest: createDigest({ digestId: "candidate-2", relatedRunId: "run-2" }),
+    expectedCreate: true,
+  },
+  {
+    caseId: "dedupe-budget-alert",
+    existingDigests: [createDigest({
+      digestId: "existing-3",
+      digestType: "budget_alert",
+      relatedBudgetId: "budget-1",
+      relatedRunId: undefined,
+      title: "Budget high",
+      summary: "Budget high",
+    })],
+    candidateDigest: createDigest({
+      digestId: "candidate-3",
+      digestType: "budget_alert",
+      relatedBudgetId: "budget-1",
+      relatedRunId: undefined,
+      title: "Budget high",
+      summary: "Budget high",
+    }),
+    expectedCreate: false,
+  },
+];
+
+export function getDigestPolicyBenchmarkSummary() {
+  return evaluateDigestPolicyReplay(digestPolicyBenchmarkCases);
+}
+
+export function getQualityScorecardSummary() {
+  return buildQualityScorecard({
+    ideation: getIdeationBenchmarkSummary(),
+    digestPolicy: getDigestPolicyBenchmarkSummary(),
+  });
 }
