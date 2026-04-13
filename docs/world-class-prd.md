@@ -463,7 +463,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 ### 16.3 Persistence and schemas
 
 - [x] Add runtime validation for core entities.
-- [ ] Extend schema coverage to every persisted entity type.
+- [x] Extend schema coverage to every persisted entity type.
 - [ ] Audit entity keys, scope rules, and lookup patterns for consistency.
 - [ ] Add repository tests that assert entity persistence shape and lookup semantics.
 - [ ] Reduce duplicate entity-query patterns by consolidating common repository methods.

@@ -35,13 +35,22 @@ import {
   autopilotProjectSchema,
   checkpointSchema,
   companyBudgetSchema,
+  convoyTaskSchema,
   deliveryRunSchema,
   digestSchema,
   ideaSchema,
+  knowledgeEntrySchema,
+  learnerSummarySchema,
+  operatorInterventionSchema,
+  planningArtifactSchema,
   preferenceProfileSchema,
+  productLockSchema,
   releaseHealthCheckSchema,
   rollbackActionSchema,
+  researchFindingSchema,
   researchCycleSchema,
+  swipeEventSchema,
+  workspaceLeaseSchema,
 } from "./schemas.js";
 import { scoreIdeaDuplicateCandidate } from "./services/duplicates.js";
 
@@ -283,14 +292,15 @@ export async function upsertResearchFinding(
   ctx: PluginContext,
   finding: ResearchFinding
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(researchFindingSchema, finding);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.researchFinding,
     scopeKind: "project",
-    scopeId: finding.projectId,
-    externalId: finding.findingId,
-    title: finding.title.slice(0, 80),
+    scopeId: validated.projectId,
+    externalId: validated.findingId,
+    title: validated.title.slice(0, 80),
     status: "active",
-    data: finding as unknown as Record<string, unknown>,
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -427,14 +437,15 @@ export async function upsertSwipeEvent(
   ctx: PluginContext,
   swipe: SwipeEvent
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(swipeEventSchema, swipe);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.swipeEvent,
     scopeKind: "project",
-    scopeId: swipe.projectId,
-    externalId: swipe.swipeId,
-    title: `Swipe ${swipe.decision} — ${swipe.ideaId.slice(0, 8)}`,
+    scopeId: validated.projectId,
+    externalId: validated.swipeId,
+    title: `Swipe ${validated.decision} — ${validated.ideaId.slice(0, 8)}`,
     status: "active",
-    data: swipe as unknown as Record<string, unknown>,
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -500,14 +511,15 @@ export async function upsertPlanningArtifact(
   ctx: PluginContext,
   artifact: PlanningArtifact
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(planningArtifactSchema, artifact);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.planningArtifact,
     scopeKind: "project",
-    scopeId: artifact.projectId,
-    externalId: artifact.artifactId,
-    title: artifact.title.slice(0, 80),
+    scopeId: validated.projectId,
+    externalId: validated.artifactId,
+    title: validated.title.slice(0, 80),
     status: "active",
-    data: artifact as unknown as Record<string, unknown>,
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -635,14 +647,15 @@ export async function upsertWorkspaceLease(
   ctx: PluginContext,
   lease: WorkspaceLease
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(workspaceLeaseSchema, lease);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.workspaceLease,
     scopeKind: "project",
-    scopeId: lease.projectId,
-    externalId: lease.leaseId,
-    title: `Lease ${lease.branchName}`,
-    status: lease.isActive ? "active" : "inactive",
-    data: lease as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.leaseId,
+    title: `Lease ${validated.branchName}`,
+    status: validated.isActive ? "active" : "inactive",
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -702,14 +715,15 @@ export async function upsertConvoyTask(
   ctx: PluginContext,
   task: ConvoyTask
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(convoyTaskSchema, task);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.convoyTask,
     scopeKind: "project",
-    scopeId: task.projectId,
-    externalId: task.taskId,
-    title: task.title.slice(0, 80),
-    status: convoyTaskStatusToEntityStatus(task.status),
-    data: task as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.taskId,
+    title: validated.title.slice(0, 80),
+    status: convoyTaskStatusToEntityStatus(validated.status),
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -786,14 +800,15 @@ export async function upsertProductLock(
   ctx: PluginContext,
   lock: ProductLock
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(productLockSchema, lock);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.productLock,
     scopeKind: "project",
-    scopeId: lock.projectId,
-    externalId: lock.lockId,
-    title: `Lock ${lock.lockType} — ${lock.targetBranch}`,
-    status: lock.isActive ? "active" : "inactive",
-    data: lock as unknown as Record<string, unknown>,
+    scopeId: validated.projectId,
+    externalId: validated.lockId,
+    title: `Lock ${validated.lockType} — ${validated.targetBranch}`,
+    status: validated.isActive ? "active" : "inactive",
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -837,14 +852,15 @@ export async function upsertOperatorIntervention(
   ctx: PluginContext,
   intervention: OperatorIntervention
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(operatorInterventionSchema, intervention);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.operatorIntervention,
     scopeKind: "project",
-    scopeId: intervention.projectId,
-    externalId: intervention.interventionId,
-    title: `${intervention.interventionType} on ${intervention.runId.slice(0, 8)}`,
+    scopeId: validated.projectId,
+    externalId: validated.interventionId,
+    title: `${validated.interventionType} on ${validated.runId.slice(0, 8)}`,
     status: "active",
-    data: intervention as unknown as Record<string, unknown>,
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -874,14 +890,15 @@ export async function upsertLearnerSummary(
   ctx: PluginContext,
   summary: LearnerSummary
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(learnerSummarySchema, summary);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.learnerSummary,
     scopeKind: "project",
-    scopeId: summary.projectId,
-    externalId: summary.summaryId,
-    title: summary.title.slice(0, 80),
+    scopeId: validated.projectId,
+    externalId: validated.summaryId,
+    title: validated.title.slice(0, 80),
     status: "active",
-    data: summary as unknown as Record<string, unknown>,
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 
@@ -906,14 +923,15 @@ export async function upsertKnowledgeEntry(
   ctx: PluginContext,
   entry: KnowledgeEntry
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(knowledgeEntrySchema, entry);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.knowledgeEntry,
     scopeKind: "project",
-    scopeId: entry.projectId,
-    externalId: entry.entryId,
-    title: entry.title.slice(0, 80),
+    scopeId: validated.projectId,
+    externalId: validated.entryId,
+    title: validated.title.slice(0, 80),
     status: "active",
-    data: entry as unknown as Record<string, unknown>,
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 

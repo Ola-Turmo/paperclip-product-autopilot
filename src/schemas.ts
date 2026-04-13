@@ -13,7 +13,12 @@ const ideaStatusSchema = z.enum([
 const researchStatusSchema = z.enum(["pending", "running", "completed", "failed"]);
 const runStatusSchema = z.enum(["pending", "running", "paused", "completed", "failed", "cancelled"]);
 const complexitySchema = z.enum(["low", "medium", "high"]);
+const executionModeSchema = z.enum(["simple", "convoy"]);
+const approvalModeSchema = z.enum(["manual", "auto_approve"]);
 const convoyTaskStatusSchema = z.enum(["pending", "blocked", "running", "passed", "failed", "skipped"]);
+const interventionTypeSchema = z.enum(["note", "checkpoint_request", "nudge", "linked_issue_inspection"]);
+const lockTypeSchema = z.enum(["product_lock", "merge_lock"]);
+const knowledgeTypeSchema = z.enum(["procedure", "pattern", "lesson", "skill"]);
 const digestStatusSchema = z.enum(["pending", "delivered", "read", "dismissed"]);
 const digestPrioritySchema = z.enum(["low", "medium", "high", "critical"]);
 const digestTypeSchema = z.enum([
@@ -67,6 +72,21 @@ export const researchCycleSchema = z.object({
   error: z.string().optional(),
 });
 
+export const researchFindingSchema = z.object({
+  findingId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  cycleId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  sourceUrl: z.string().optional(),
+  sourceLabel: z.string().optional(),
+  evidenceText: z.string().optional(),
+  category: z.enum(["opportunity", "threat", "risk", "competitive", "user_feedback", "technical"]).optional(),
+  confidence: z.number().min(0).max(1),
+  createdAt: z.string().min(1),
+});
+
 export const ideaSchema = z.object({
   ideaId: z.string().min(1),
   companyId: z.string().min(1),
@@ -90,6 +110,16 @@ export const ideaSchema = z.object({
   updatedAt: z.string().min(1),
 });
 
+export const swipeEventSchema = z.object({
+  swipeId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  ideaId: z.string().min(1),
+  decision: z.enum(["pass", "maybe", "yes", "now"]),
+  note: z.string().optional(),
+  createdAt: z.string().min(1),
+});
+
 const swipeBreakdownSchema = z.object({
   pass: z.number().int().nonnegative(),
   maybe: z.number().int().nonnegative(),
@@ -111,6 +141,26 @@ export const preferenceProfileSchema = z.object({
   avgApprovedScore: z.number(),
   avgRejectedScore: z.number(),
   lastUpdated: z.string().min(1),
+});
+
+export const planningArtifactSchema = z.object({
+  artifactId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  ideaId: z.string().min(1),
+  title: z.string().min(1),
+  goalAlignmentSummary: z.string(),
+  implementationSpec: z.string(),
+  dependencies: z.array(z.string()),
+  rolloutPlan: z.string(),
+  testPlan: z.string(),
+  approvalChecklist: z.array(z.string()),
+  executionMode: executionModeSchema,
+  approvalMode: approvalModeSchema,
+  automationTier: automationTierSchema,
+  status: z.enum(["draft", "approved", "in_progress", "completed", "cancelled"]),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
 });
 
 export const deliveryRunSchema = z.object({
@@ -161,6 +211,57 @@ export const companyBudgetSchema = z.object({
   updatedAt: z.string().min(1),
 });
 
+export const workspaceLeaseSchema = z.object({
+  leaseId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  runId: z.string().min(1),
+  workspacePath: z.string().min(1),
+  branchName: z.string().min(1),
+  leasedPort: z.number().nullable(),
+  gitRepoRoot: z.string().nullable(),
+  isActive: z.boolean(),
+  createdAt: z.string().min(1),
+  releasedAt: z.string().nullable(),
+}).superRefine((lease, ctx) => {
+  if (lease.isActive && lease.releasedAt !== null) {
+    ctx.addIssue({ code: "custom", message: "active leases cannot include releasedAt", path: ["releasedAt"] });
+  }
+  if (!lease.isActive && lease.releasedAt === null) {
+    ctx.addIssue({ code: "custom", message: "released leases must include releasedAt", path: ["releasedAt"] });
+  }
+});
+
+export const convoyTaskSchema = z.object({
+  taskId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  runId: z.string().min(1),
+  artifactId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string(),
+  status: convoyTaskStatusSchema,
+  dependsOnTaskIds: z.array(z.string()),
+  startedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  error: z.string().optional(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+}).superRefine((task, ctx) => {
+  if (task.dependsOnTaskIds.includes(task.taskId)) {
+    ctx.addIssue({ code: "custom", message: "tasks cannot depend on themselves", path: ["dependsOnTaskIds"] });
+  }
+  if (task.status === "running" && task.startedAt === null) {
+    ctx.addIssue({ code: "custom", message: "running tasks must include startedAt", path: ["startedAt"] });
+  }
+  if (["passed", "failed", "skipped"].includes(task.status) && task.completedAt === null) {
+    ctx.addIssue({ code: "custom", message: "terminal tasks must include completedAt", path: ["completedAt"] });
+  }
+  if (["pending", "blocked", "running"].includes(task.status) && task.completedAt !== null) {
+    ctx.addIssue({ code: "custom", message: "non-terminal tasks cannot include completedAt", path: ["completedAt"] });
+  }
+});
+
 export const checkpointSchema = z.object({
   checkpointId: z.string().min(1),
   companyId: z.string().min(1),
@@ -177,6 +278,91 @@ export const checkpointSchema = z.object({
   }),
   pauseReason: z.string().optional(),
   createdAt: z.string().min(1),
+});
+
+export const productLockSchema = z.object({
+  lockId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  runId: z.string().min(1),
+  lockType: lockTypeSchema,
+  targetBranch: z.string().min(1),
+  targetPath: z.string(),
+  acquiredAt: z.string().min(1),
+  releasedAt: z.string().nullable(),
+  isActive: z.boolean(),
+  blockReason: z.string().optional(),
+}).superRefine((lock, ctx) => {
+  if (lock.isActive && lock.releasedAt !== null) {
+    ctx.addIssue({ code: "custom", message: "active locks cannot include releasedAt", path: ["releasedAt"] });
+  }
+  if (!lock.isActive && lock.releasedAt === null) {
+    ctx.addIssue({ code: "custom", message: "released locks must include releasedAt", path: ["releasedAt"] });
+  }
+});
+
+export const operatorInterventionSchema = z.object({
+  interventionId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  runId: z.string().min(1),
+  interventionType: interventionTypeSchema,
+  note: z.string().optional(),
+  checkpointId: z.string().optional(),
+  linkedIssueId: z.string().optional(),
+  linkedIssueUrl: z.string().optional(),
+  linkedIssueTitle: z.string().optional(),
+  linkedIssueComments: z.array(z.string()).optional(),
+  createdAt: z.string().min(1),
+}).superRefine((intervention, ctx) => {
+  if (intervention.interventionType === "note" && !intervention.note) {
+    ctx.addIssue({ code: "custom", message: "note interventions require note text", path: ["note"] });
+  }
+  if (intervention.interventionType === "linked_issue_inspection" && !intervention.linkedIssueId && !intervention.linkedIssueUrl) {
+    ctx.addIssue({ code: "custom", message: "linked issue inspections require linked issue metadata", path: ["linkedIssueId"] });
+  }
+});
+
+export const learnerSummarySchema = z.object({
+  summaryId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  runId: z.string().min(1),
+  ideaId: z.string().min(1),
+  title: z.string().min(1),
+  summaryText: z.string().min(1),
+  keyLearnings: z.array(z.string()),
+  skillsReinjected: z.array(z.string()),
+  metrics: z.object({
+    duration: z.number().nonnegative().optional(),
+    commits: z.number().int().nonnegative().optional(),
+    testsAdded: z.number().int().nonnegative().optional(),
+    testsPassed: z.number().int().nonnegative().optional(),
+    filesChanged: z.number().int().nonnegative().optional(),
+  }),
+  createdAt: z.string().min(1),
+});
+
+export const knowledgeEntrySchema = z.object({
+  entryId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  knowledgeType: knowledgeTypeSchema,
+  title: z.string().min(1),
+  content: z.string().min(1),
+  reinjectionCommand: z.string().optional(),
+  sourceRunId: z.string().optional(),
+  sourceSummaryId: z.string().optional(),
+  usedInRunId: z.string().optional(),
+  lastUsedAt: z.string().optional(),
+  usageCount: z.number().int().nonnegative(),
+  tags: z.array(z.string()),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+}).superRefine((entry, ctx) => {
+  if (entry.usedInRunId && !entry.lastUsedAt) {
+    ctx.addIssue({ code: "custom", message: "used knowledge entries must include lastUsedAt", path: ["lastUsedAt"] });
+  }
 });
 
 export const digestSchema = z.object({
