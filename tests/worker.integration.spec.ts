@@ -444,6 +444,20 @@ describe("worker integration", () => {
   it("generates ideas deterministically from ranked research findings", async () => {
     await upsertAutopilotProject(harness.ctx, createProject());
     await upsertPreferenceProfile(harness.ctx, createPreferenceProfile());
+    await upsertIdea(harness.ctx, createIdea({
+      ideaId: "idea-history",
+      category: "technical",
+      tags: ["technical"],
+      complexityEstimate: "low",
+      status: "completed",
+    }));
+    await upsertDeliveryRun(harness.ctx, createRun({
+      runId: "run-history",
+      ideaId: "idea-history",
+      status: "completed",
+      completedAt: "2026-01-02T01:00:00.000Z",
+      updatedAt: "2026-01-02T01:00:00.000Z",
+    }));
     await upsertResearchCycle(harness.ctx, createResearchCycle());
     await upsertResearchFinding(harness.ctx, createFinding({ findingId: "finding-1", title: "Improve onboarding completion", category: "user_feedback", confidence: 0.92 }));
     await upsertResearchFinding(harness.ctx, createFinding({ findingId: "finding-2", title: "Investigate merge queue friction", category: "technical", confidence: 0.75 }));
@@ -459,10 +473,13 @@ describe("worker integration", () => {
       scopeKind: "project",
       scopeId: "project-1",
     });
+    const generatedIdea = ideas.find((entity) =>
+      String(entity.data.title).includes("Improve onboarding completion"),
+    );
 
     expect(toolResult.content).toContain("Generated 2 ideas");
-    expect(ideas[0]?.data.title).toContain("Improve onboarding completion");
-    expect(ideas[0]?.data.impactScore).toBeGreaterThanOrEqual(ideas[1]?.data.impactScore);
-    expect(ideas[0]?.data.sourceReferences).toEqual(["https://example.com/support"]);
+    expect(generatedIdea?.data.title).toContain("Improve onboarding completion");
+    expect(generatedIdea?.data.sourceReferences).toEqual(["https://example.com/support"]);
+    expect(generatedIdea?.data.rationale).toContain("outcomeBoost=");
   });
 });

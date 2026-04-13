@@ -1,4 +1,8 @@
 import type { Idea, PreferenceProfile, ResearchFinding } from "../types.js";
+import {
+  computeOutcomeBoost,
+  type OutcomePreferenceSignals,
+} from "./preference-learning.js";
 
 function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -66,6 +70,7 @@ function normalizeTitle(title: string): string {
 export function scoreFindingForIdea(
   finding: ResearchFinding,
   profile?: PreferenceProfile | null,
+  outcomeSignals?: OutcomePreferenceSignals | null,
 ): {
   impactScore: number;
   feasibilityScore: number;
@@ -74,14 +79,31 @@ export function scoreFindingForIdea(
 } {
   const confidenceBoost = (finding.confidence - 0.5) * 24;
   const preferenceBoost = computePreferenceBoost(profile, finding.category);
+  const outcomeBoost = computeOutcomeBoost({
+    signals: outcomeSignals,
+    category: finding.category,
+    tags: finding.category ? [finding.category] : [],
+  });
 
-  const impactScore = clampScore(categoryBaseImpact(finding.category) + confidenceBoost + preferenceBoost);
-  const feasibilityScore = clampScore(categoryBaseFeasibility(finding.category) + confidenceBoost / 2 + preferenceBoost / 2);
+  const impactScore = clampScore(
+    categoryBaseImpact(finding.category) +
+      confidenceBoost +
+      preferenceBoost +
+      outcomeBoost.boost,
+  );
+  const feasibilityScore = clampScore(
+    categoryBaseFeasibility(finding.category) +
+      confidenceBoost / 2 +
+      preferenceBoost / 2 +
+      outcomeBoost.boost / 2,
+  );
   const rankingScore = clampScore(impactScore * 0.65 + feasibilityScore * 0.35);
   const explanation = [
     `category=${finding.category ?? "general"}`,
     `confidence=${finding.confidence.toFixed(2)}`,
     `preferenceBoost=${preferenceBoost.toFixed(1)}`,
+    `outcomeBoost=${outcomeBoost.boost.toFixed(1)}`,
+    `outcomeEvidence=${outcomeBoost.evidenceCount}`,
     `impact=${impactScore}`,
     `feasibility=${feasibilityScore}`,
   ].join(", ");
@@ -92,11 +114,12 @@ export function scoreFindingForIdea(
 export function rankFindingsForIdeation(
   findings: ResearchFinding[],
   profile?: PreferenceProfile | null,
+  outcomeSignals?: OutcomePreferenceSignals | null,
 ): Array<ResearchFinding & { rankingScore: number; impactScore: number; feasibilityScore: number; explanation: string }> {
   return findings
     .map((finding) => ({
       ...finding,
-      ...scoreFindingForIdea(finding, profile),
+      ...scoreFindingForIdea(finding, profile, outcomeSignals),
     }))
     .sort((a, b) =>
       b.rankingScore - a.rankingScore ||
@@ -112,8 +135,9 @@ export function buildIdeaDraftFromFinding(input: {
   ideaId: string;
   createdAt: string;
   profile?: PreferenceProfile | null;
+  outcomeSignals?: OutcomePreferenceSignals | null;
 }): Idea {
-  const scored = scoreFindingForIdea(input.finding, input.profile);
+  const scored = scoreFindingForIdea(input.finding, input.profile, input.outcomeSignals);
   const normalizedTitle = normalizeTitle(input.finding.title);
   const sourceLabel = input.finding.sourceLabel ?? input.finding.sourceUrl ?? "research";
 

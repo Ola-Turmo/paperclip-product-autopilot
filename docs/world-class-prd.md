@@ -491,8 +491,8 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 
 ### 16.6 Preference learning and feedback loops
 
-- [ ] Expand preference learning beyond swipe counts.
-- [ ] Incorporate outcomes such as delivery success, rollback, health-check failure, and completion time.
+- [~] Expand preference learning beyond swipe counts.
+- [~] Incorporate outcomes such as delivery success, rollback, health-check failure, and completion time.
 - [ ] Track category, complexity, and execution-mode preference signals separately.
 - [ ] Make preference explanations visible in ranking and operator review surfaces.
 - [ ] Add regression tests for preference updates from both swipes and outcomes.

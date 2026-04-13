@@ -6,6 +6,7 @@ import { findDuplicateIdea, newId, nowIso } from "../helpers.js";
 import { createAutopilotRepository } from "../repositories/autopilot.js";
 import { buildIdeaDraftFromFinding, rankFindingsForIdeation } from "../services/ideation.js";
 import { processSwipeDecision } from "../services/orchestration.js";
+import { buildOutcomePreferenceSignals } from "../services/preference-learning.js";
 import { parsePositiveInt } from "./action-utils.js";
 
 function isSwipeDecision(value: unknown): value is SwipeDecision {
@@ -123,11 +124,21 @@ export function registerIdeaToolHandlers(ctx: PluginContext) {
   }, async (params, _runCtx): Promise<ToolResult> => {
     const a = params as { companyId: string; projectId: string; count?: number };
     const count = parsePositiveInt(a.count, 5);
-    const [findings, profile] = await Promise.all([
+    const [findings, profile, historicalIdeas, runs, checks, rollbacks] = await Promise.all([
       repo.listResearchFindings(a.companyId, a.projectId),
       repo.getPreferenceProfile(a.companyId, a.projectId),
+      repo.listIdeas(a.companyId, a.projectId),
+      repo.listDeliveryRuns(a.companyId, a.projectId),
+      repo.listReleaseHealthChecks(a.companyId, a.projectId),
+      repo.listRollbackActions(a.companyId, a.projectId),
     ]);
-    const rankedFindings = rankFindingsForIdeation(findings, profile);
+    const outcomeSignals = buildOutcomePreferenceSignals({
+      ideas: historicalIdeas,
+      runs,
+      healthChecks: checks,
+      rollbacks,
+    });
+    const rankedFindings = rankFindingsForIdeation(findings, profile, outcomeSignals);
     const created: Idea[] = [];
     const seenDuplicateIds = new Set<string>();
 
@@ -140,6 +151,7 @@ export function registerIdeaToolHandlers(ctx: PluginContext) {
         ideaId: newId(),
         createdAt: nowIso(),
         profile,
+        outcomeSignals,
       });
       const duplicate = await findDuplicateIdea(ctx, a.companyId, a.projectId, idea.title, idea.description, undefined, {
         category: idea.category,

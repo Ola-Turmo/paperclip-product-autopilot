@@ -5,6 +5,7 @@ import {
   getDeliveryRun,
   getIdea,
   getPreferenceProfile,
+  listDeliveryRuns,
   listAutopilotProjectEntities,
   listCheckpoints,
   listConvoyTasks,
@@ -64,6 +65,7 @@ export interface AutopilotRepository {
   getAutopilotProject(companyId: string, projectId: string): Promise<AutopilotProject | null>;
   upsertAutopilotProject(project: AutopilotProject): Promise<void>;
   getDeliveryRun(companyId: string, projectId: string, runId: string): Promise<DeliveryRun | null>;
+  listDeliveryRuns(companyId: string, projectId: string, status?: RunStatus): Promise<DeliveryRun[]>;
   getIdea(companyId: string, projectId: string, ideaId: string): Promise<Idea | null>;
   listIdeas(companyId: string, projectId: string, status?: IdeaStatus): Promise<Idea[]>;
   listMaybePoolIdeas(companyId: string, projectId: string): Promise<Idea[]>;
@@ -108,6 +110,7 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
       await upsertAutopilotProject(ctx, project);
     },
     getDeliveryRun: (companyId, projectId, runId) => getDeliveryRun(ctx, companyId, projectId, runId),
+    listDeliveryRuns: (companyId, projectId, status) => listDeliveryRuns(ctx, companyId, projectId, status),
     getIdea: (companyId, projectId, ideaId) => getIdea(ctx, companyId, projectId, ideaId),
     listIdeas: (companyId, projectId, status) => listIdeas(ctx, companyId, projectId, status),
     listMaybePoolIdeas: (companyId, projectId) => listMaybePoolIdeas(ctx, companyId, projectId),

@@ -5,6 +5,7 @@ import {
   rankFindingsForIdeation,
   scoreFindingForIdea,
 } from "../src/services/ideation.js";
+import { buildOutcomePreferenceSignals } from "../src/services/preference-learning.js";
 
 function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFinding {
   return {
@@ -79,5 +80,70 @@ describe("ideation service", () => {
     expect(idea.rationale).toContain("confidence=0.90");
     expect(idea.sourceReferences).toEqual(["https://example.com/source"]);
     expect(idea.impactScore).toBeGreaterThan(70);
+  });
+
+  it("uses historical delivery outcomes to boost favored categories", () => {
+    const outcomeSignals = buildOutcomePreferenceSignals({
+      ideas: [
+        {
+          ideaId: "idea-1",
+          companyId: "company-1",
+          projectId: "project-1",
+          title: "Improve onboarding",
+          description: "Better activation",
+          rationale: "Activation issue",
+          sourceReferences: [],
+          impactScore: 80,
+          feasibilityScore: 72,
+          complexityEstimate: "medium",
+          category: "user_feedback",
+          tags: ["user_feedback"],
+          status: "completed",
+          duplicateAnnotated: false,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      runs: [
+        {
+          runId: "run-1",
+          companyId: "company-1",
+          projectId: "project-1",
+          ideaId: "idea-1",
+          artifactId: "artifact-1",
+          title: "Delivery",
+          status: "completed",
+          automationTier: "semiauto",
+          branchName: "autopilot/project/idea",
+          workspacePath: "/tmp/project",
+          leasedPort: 3000,
+          commitSha: "abc1234",
+          paused: false,
+          completedAt: "2026-01-01T02:00:00.000Z",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T02:00:00.000Z",
+        },
+      ],
+      healthChecks: [
+        {
+          checkId: "check-1",
+          companyId: "company-1",
+          projectId: "project-1",
+          runId: "run-1",
+          checkType: "smoke_test",
+          name: "Smoke",
+          status: "passed",
+          passedAt: "2026-01-01T02:00:00.000Z",
+          createdAt: "2026-01-01T00:30:00.000Z",
+        },
+      ],
+      rollbacks: [],
+    });
+
+    const withoutOutcome = scoreFindingForIdea(createFinding({ category: "user_feedback" }), createProfile(), null);
+    const withOutcome = scoreFindingForIdea(createFinding({ category: "user_feedback" }), createProfile(), outcomeSignals);
+
+    expect(withOutcome.rankingScore).toBeGreaterThan(withoutOutcome.rankingScore);
+    expect(withOutcome.explanation).toContain("outcomeBoost=");
   });
 });
