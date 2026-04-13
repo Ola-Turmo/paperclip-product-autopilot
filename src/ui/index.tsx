@@ -23,6 +23,7 @@ import type {
   ResearchCycle,
 } from "../types.js";
 import { getIdeationBenchmarkSummary } from "../services/evaluation-fixtures.js";
+import { classifyFailureMessage, formatFailureCategory } from "../services/failure-taxonomy.js";
 
 const PAGE: CSSProperties = { display: "grid", gap: 16, padding: 20 };
 const CARD: CSSProperties = {
@@ -365,6 +366,11 @@ function RunsCard(props: { companyId: string; projectId: string }) {
               </div>
               <div style={MUTED}>Branch: {run.branchName}</div>
               <div style={MUTED}>Workspace: {run.workspacePath}</div>
+              {classifyFailureMessage(run.error) ? (
+                <div style={{ fontSize: 12, color: "#92400e", marginTop: 6 }}>
+                  Failure class: {formatFailureCategory(classifyFailureMessage(run.error))}
+                </div>
+              ) : null}
               {run.error ? <div style={{ color: "#dc2626", fontSize: 13, marginTop: 6 }}>{run.error}</div> : null}
             </div>
           ))}
@@ -510,14 +516,20 @@ function AuditTimeline(props: {
       id: check.checkId,
       at: check.failedAt ?? check.passedAt ?? check.createdAt,
       title: `Health check: ${check.name}`,
-      detail: check.errorMessage ?? check.checkType,
+      detail: [
+        check.errorMessage ?? check.checkType,
+        formatFailureCategory(classifyFailureMessage(check.errorMessage)),
+      ].filter(Boolean).join(" | "),
       status: check.status,
     })),
     ...props.rollbacks.map((rollback) => ({
       id: rollback.rollbackId,
       at: rollback.completedAt ?? rollback.createdAt,
       title: `Rollback: ${rollback.rollbackType}`,
-      detail: rollback.errorMessage ?? rollback.status,
+      detail: [
+        rollback.errorMessage ?? rollback.status,
+        formatFailureCategory(classifyFailureMessage(rollback.errorMessage)),
+      ].filter(Boolean).join(" | "),
       status: rollback.status,
     })),
     ...props.interventions.map((intervention) => ({
@@ -744,6 +756,9 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
           <div style={MUTED}>Workspace: {run.workspacePath}</div>
           <div style={MUTED}>Port: {run.leasedPort ?? "n/a"}</div>
           <div style={MUTED}>Commit: {run.commitSha ?? "n/a"}</div>
+          {classifyFailureMessage(run.error) ? (
+            <div style={MUTED}>Failure class: {formatFailureCategory(classifyFailureMessage(run.error))}</div>
+          ) : null}
           {run.pauseReason ? <div style={MUTED}>Pause reason: {run.pauseReason}</div> : null}
           {run.error ? <div style={{ color: "#dc2626", fontSize: 13 }}>{run.error}</div> : null}
         </div>
@@ -760,6 +775,11 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
                   <StatusPill status={check.status} />
                 </div>
                 <div style={{ ...MUTED, marginTop: 6 }}>Type: {check.checkType}</div>
+                {classifyFailureMessage(check.errorMessage) ? (
+                  <div style={{ fontSize: 12, color: "#92400e", marginTop: 6 }}>
+                    Failure class: {formatFailureCategory(classifyFailureMessage(check.errorMessage))}
+                  </div>
+                ) : null}
                 {check.errorMessage ? <div style={{ color: "#dc2626", fontSize: 13, marginTop: 6 }}>{check.errorMessage}</div> : null}
               </div>
             ))}
