@@ -68,6 +68,14 @@ const BUTTON_SECONDARY: CSSProperties = {
   color: "#0f172a",
 };
 const MUTED: CSSProperties = { fontSize: 13, color: "#64748b" };
+const EMPTY_PANEL: CSSProperties = {
+  border: "1px dashed #cbd5e1",
+  borderRadius: 12,
+  padding: 16,
+  background: "#f8fafc",
+  display: "grid",
+  gap: 6,
+};
 const STATUS: Record<string, string> = {
   active: "#16a34a",
   approved: "#2563eb",
@@ -126,6 +134,25 @@ function Section(props: { title: string; children: ReactNode; action?: ReactNode
       </div>
       {props.children}
     </section>
+  );
+}
+
+function EmptyState(props: { title: string; body: string; action?: ReactNode }) {
+  return (
+    <div style={EMPTY_PANEL}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{props.title}</div>
+      <div style={MUTED}>{props.body}</div>
+      {props.action ? <div style={{ marginTop: 4 }}>{props.action}</div> : null}
+    </div>
+  );
+}
+
+function LoadingState(props: { label: string }) {
+  return (
+    <div style={EMPTY_PANEL}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>Loading {props.label}</div>
+      <div style={MUTED}>Fetching the latest operator state.</div>
+    </div>
   );
 }
 
@@ -324,7 +351,10 @@ function IdeasCard(props: { companyId: string; projectId: string }) {
   return (
     <Section title="Idea Pool">
       {!ideas || ideas.length === 0 ? (
-        <div style={MUTED}>No ideas yet.</div>
+        <EmptyState
+          title="No ideas yet"
+          body="Run research or generate ideas to seed the opportunity queue for operator review."
+        />
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
           {ideas.slice(0, 8).map((idea) => (
@@ -369,7 +399,10 @@ function RunsCard(props: { companyId: string; projectId: string }) {
   return (
     <Section title="Delivery Runs">
       {!runs || runs.length === 0 ? (
-        <div style={MUTED}>No delivery runs yet.</div>
+        <EmptyState
+          title="No delivery runs yet"
+          body="Approved ideas will appear here once the system turns them into executable runs."
+        />
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
           {runs.slice(0, 8).map((run) => (
@@ -420,7 +453,10 @@ function DigestsCard(props: { companyId: string; projectId: string; onRefresh: (
   return (
     <Section title="Digest Inbox">
       {!digests || digests.length === 0 ? (
-        <div style={MUTED}>No digests yet.</div>
+        <EmptyState
+          title="No digests right now"
+          body="When budgets, stuck runs, or other operator-visible events need attention, they will land here."
+        />
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
           {digests.slice(0, 8).map((digest) => (
@@ -479,7 +515,10 @@ function LearningCard(props: { companyId: string; projectId: string }) {
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Recent Learner Summaries</div>
           {!summaries || summaries.length === 0 ? (
-            <div style={MUTED}>No learner summaries yet.</div>
+            <EmptyState
+              title="No learner summaries yet"
+              body="Completed runs will feed back lessons, metrics, and reusable patterns here."
+            />
           ) : (
             <div style={{ display: "grid", gap: 10 }}>
               {summaries.slice(0, 3).map((summary) => (
@@ -499,7 +538,10 @@ function LearningCard(props: { companyId: string; projectId: string }) {
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Reusable Knowledge</div>
           {!knowledge || knowledge.length === 0 ? (
-            <div style={MUTED}>No reusable knowledge entries yet.</div>
+            <EmptyState
+              title="No reusable knowledge yet"
+              body="As runs complete, proven lessons and procedures will accumulate here for later reuse."
+            />
           ) : (
             <div style={{ display: "grid", gap: 10 }}>
               {knowledge.slice(0, 4).map((entry) => (
@@ -630,12 +672,19 @@ export function AutopilotProjectTab({ context }: PluginDetailTabProps) {
   }
 
   if (!companyId) {
-    return <div style={PAGE}>Autopilot requires company context.</div>;
+    return (
+      <div style={PAGE}>
+        <EmptyState
+          title="Company Context Required"
+          body="Open this surface from a company-backed project so Product Autopilot can load the right state."
+        />
+      </div>
+    );
   }
 
   return (
     <div style={PAGE}>
-      {overview ? <StatsRow overview={overview} /> : null}
+      {overview ? <StatsRow overview={overview} /> : <LoadingState label="overview" />}
       <ProjectSettingsCard companyId={companyId} projectId={projectId} project={project} onSaved={refreshAll} />
       <ResearchCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
       <EvaluationCard />
@@ -671,11 +720,22 @@ export function AutopilotProjectWidget({ context }: PluginWidgetProps) {
   });
 
   if (!companyId || !projectId) {
-    return <div style={CARD}>Autopilot widget is unavailable outside project context.</div>;
+    return (
+      <div style={CARD}>
+        <EmptyState
+          title="Project Context Required"
+          body="Open the widget from a project context to see Product Autopilot metrics."
+        />
+      </div>
+    );
   }
 
   if (!overview) {
-    return <div style={CARD}>Loading Autopilot overview...</div>;
+    return (
+      <div style={CARD}>
+        <LoadingState label="autopilot overview" />
+      </div>
+    );
   }
 
   return (
@@ -708,7 +768,10 @@ export function AutopilotDashboardWidget({ context }: PluginWidgetProps) {
     <div style={{ ...CARD, display: "grid", gap: 10 }}>
       <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Autopilot Dashboard</div>
       {!projects || projects.length === 0 ? (
-        <div style={MUTED}>No autopilot-enabled projects yet.</div>
+        <EmptyState
+          title="No autopilot-enabled projects yet"
+          body="Enable Product Autopilot on a project to surface company-wide operator status here."
+        />
       ) : (
         projects.slice(0, 8).map((project) => (
           <div key={project.autopilotId} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
@@ -730,7 +793,10 @@ export function AutopilotSettings({ context }: PluginSettingsPageProps) {
     <div style={PAGE}>
       <Section title="Autopilot Settings">
         {!projects || projects.length === 0 ? (
-          <div style={MUTED}>No projects have Autopilot configured yet.</div>
+          <EmptyState
+            title="No configured projects yet"
+            body="Once a project enables Product Autopilot, its configuration and policy settings will appear here."
+          />
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
             {projects.map((project) => (
@@ -800,7 +866,11 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
   const healthSummary = summarizeReleaseHealthChecks(checks ?? []);
 
   if (!run) {
-    return <div style={PAGE}>Loading run details...</div>;
+    return (
+      <div style={PAGE}>
+        <LoadingState label="run details" />
+      </div>
+    );
   }
   const activeRun = run;
 
@@ -910,7 +980,10 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
       </Section>
       <Section title="Release Health">
         {!checks || checks.length === 0 ? (
-          <div style={MUTED}>No release health checks yet.</div>
+          <EmptyState
+            title="No release health checks yet"
+            body="Health checks appear after a run reaches a validation boundary or ships a change."
+          />
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
             <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
@@ -942,7 +1015,10 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
       </Section>
       <Section title="Operator Interventions">
         {!interventions || interventions.length === 0 ? (
-          <div style={MUTED}>No operator interventions recorded for this run.</div>
+          <EmptyState
+            title="No operator interventions recorded"
+            body="Notes, checkpoint requests, and nudges will show up here once an operator intervenes."
+          />
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
             {interventions.map((intervention) => (
@@ -959,7 +1035,10 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
       </Section>
       <Section title="Learning and Reuse">
         {!summaries || summaries.filter((summary) => summary.runId === activeRun.runId).length === 0 ? (
-          <div style={MUTED}>No learner summaries recorded for this run.</div>
+          <EmptyState
+            title="No learner summaries for this run"
+            body="Once the run completes, the system can publish a post-run summary with learnings and metrics."
+          />
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
             {summaries.filter((summary) => summary.runId === activeRun.runId).slice(0, 3).map((summary) => (

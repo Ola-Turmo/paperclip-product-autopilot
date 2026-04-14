@@ -123,4 +123,20 @@ describe("ui smoke", () => {
     expect(html).toContain("Operator Interventions");
     expect(html).toContain("Audit Timeline");
   });
+
+  it("renders explicit loading and empty-state copy", () => {
+    const loadingHtml = renderToStaticMarkup(
+      React.createElement(uiModule.AutopilotRunDetailTab, {
+        context: { companyId: "company-1", projectId: "project-1", entityId: "missing-run" },
+      }),
+    );
+    const emptyDashboardHtml = renderToStaticMarkup(
+      React.createElement(uiModule.AutopilotDashboardWidget, {
+        context: { companyId: "company-1" },
+      }),
+    );
+
+    expect(loadingHtml).toContain("Loading run details");
+    expect(emptyDashboardHtml).toContain("No autopilot-enabled projects yet");
+  });
 });

@@ -541,7 +541,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [~] Add learning and knowledge-reuse visibility to operator surfaces.
 - [~] Add clearer intervention workflows for pause, resume, checkpoint, rollback, and note-taking.
 - [ ] Add budget and digest management surfaces.
-- [ ] Add better empty states, loading states, and error states.
+- [~] Add better empty states, loading states, and error states.
 - [~] Add UI smoke tests.
 - [ ] Add run-detail and health-check UX that exposes decision context, not just raw records.
 
