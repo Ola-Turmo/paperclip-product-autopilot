@@ -594,3 +594,7 @@ This project can credibly claim to be state of the art only when all of the foll
 The single best next step is:
 
 - Push the remaining platform work from "strong production candidate" toward "excellent operator system" by finishing UI smoke tests, digest escalation policy, and broader invariants across planning and governance flows.
+
+See also:
+
+- `docs/final-mile-prd.md` for the focused remaining-work PRD.
