@@ -447,7 +447,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [~] Expand the repository layer so all major entity access goes through repository interfaces.
 - [ ] Separate pure domain logic from Paperclip adapter logic more aggressively.
 - [ ] Introduce mappers or translators where plugin-facing DTOs and domain entities should diverge.
-- [ ] Create a small domain package structure for state machines, policies, and scoring logic.
+- [~] Create a small domain package structure for state machines, policies, and scoring logic.
 
 ### 16.2 State machines and invariants
 
@@ -456,7 +456,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [x] Formalize the digest lifecycle as an explicit state machine.
 - [x] Formalize checkpoint and rollback lifecycles as explicit state machines.
 - [~] Prevent invalid transitions centrally instead of in scattered handlers.
-- [ ] Add invariant validation helpers for impossible or contradictory entity states.
+- [~] Add invariant validation helpers for impossible or contradictory entity states.
 - [~] Add transition tests for every allowed and disallowed lifecycle step.
 - [~] Add invariant checks into runtime validation paths where appropriate.
 
@@ -500,9 +500,9 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 ### 16.7 Planning and delivery orchestration
 
 - [x] Extract delivery builders and policy logic into services.
-- [ ] Make planning artifacts more structured and less free-form.
-- [ ] Add stronger validation for approval mode, execution mode, and checklist completeness.
-- [ ] Add convoy-task dependency validation and cycle detection.
+- [~] Make planning artifacts more structured and less free-form.
+- [~] Add stronger validation for approval mode, execution mode, and checklist completeness.
+- [~] Add convoy-task dependency validation and cycle detection.
 - [ ] Add clearer rules for when checkpoints are mandatory.
 - [ ] Add delivery-run cancellation semantics if cancellation is intended to be supported.
 - [ ] Add run-time budget accounting hooks if Paperclip exposes the right telemetry.
@@ -510,21 +510,21 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 ### 16.8 Safety, rollback, and governance
 
 - [x] Add checkpoint, release-health, and rollback primitives plus observability.
-- [ ] Strengthen rollback policy and rollback-action semantics.
+- [~] Strengthen rollback policy and rollback-action semantics.
 - [~] Add stricter checkpoint restore validation.
 - [~] Add release-health aggregation logic across multiple checks.
 - [ ] Add digest escalation and suppression policy.
 - [ ] Add reopen rules, cooldown windows, and dedupe keys for digests.
 - [ ] Add explicit policy gates for destructive or risky actions.
 - [ ] Define full-auto boundaries that remain hard-coded supervised.
-- [ ] Document governance policy in the repo, not just in code.
+- [~] Document governance policy in the repo, not just in code.
 
 ### 16.9 Observability and evaluation
 
 - [x] Add basic lifecycle telemetry and metrics.
 - [~] Define a complete event taxonomy for all important transitions.
 - [~] Emit metrics for research, idea ranking, planning, delivery, rollbacks, and operator interventions.
-- [ ] Add duration and latency metrics, not just counters.
+- [~] Add duration and latency metrics, not just counters.
 - [~] Add structured failure categories.
 - [~] Build a replay harness for decision evaluation.
 - [~] Add benchmark fixtures for ranking quality, safety behavior, and digest behavior.
@@ -554,16 +554,16 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [ ] Add more worker integration tests around rollback, checkpoint restore, release-health aggregation, and digest escalation.
 - [ ] Add fixture-driven tests for ranking and duplicate detection.
 - [x] Add package-install validation in CI from a clean environment.
-- [ ] Add failure-path tests, not just happy-path tests.
+- [~] Add failure-path tests, not just happy-path tests.
 
 ### 16.12 Documentation and operator trust
 
 - [x] Add this PRD/backlog document.
-- [ ] Keep this backlog updated after every major refactor.
-- [ ] Add architecture documentation for service boundaries and state ownership.
-- [ ] Add a data model reference for persisted entities and their invariants.
-- [ ] Add an operator guide describing approval boundaries, digests, rollback, and checkpoints.
-- [ ] Add a contributor guide that explains the module structure and testing expectations.
+- [x] Keep this backlog updated after every major refactor.
+- [x] Add architecture documentation for service boundaries and state ownership.
+- [x] Add a data model reference for persisted entities and their invariants.
+- [x] Add an operator guide describing approval boundaries, digests, rollback, and checkpoints.
+- [x] Add a contributor guide that explains the module structure and testing expectations.
 
 ## 17. Top Priority Order
 
@@ -593,4 +593,4 @@ This project can credibly claim to be state of the art only when all of the foll
 
 The single best next step is:
 
-- Finish the remaining research-intelligence layer by adding reproducible cycle snapshots and deeper provenance handling, then keep tightening invariant helpers and operator intervention workflows.
+- Push the remaining platform work from "strong production candidate" toward "excellent operator system" by finishing UI smoke tests, digest escalation policy, and broader invariants across planning and governance flows.

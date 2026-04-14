@@ -25,6 +25,7 @@ export function buildPlanningArtifact(input: {
   rolloutPlan?: string;
   testPlan?: string;
   approvalChecklist?: string[];
+  executionMode?: "simple" | "convoy";
   approvalMode?: "manual" | "auto_approve";
 }): PlanningArtifact {
   return {
@@ -34,12 +35,22 @@ export function buildPlanningArtifact(input: {
     ideaId: input.ideaId,
     title: input.title ?? `Plan: ${input.idea.title.slice(0, 60)}`,
     goalAlignmentSummary: input.goalAlignmentSummary ?? input.idea.rationale,
-    implementationSpec: input.implementationSpec ?? input.idea.technicalApproach ?? "",
+    implementationSpec:
+      input.implementationSpec ??
+      input.idea.technicalApproach ??
+      input.idea.description ??
+      input.idea.rationale,
     dependencies: input.dependencies ?? [],
-    rolloutPlan: input.rolloutPlan ?? "",
-    testPlan: input.testPlan ?? "",
-    approvalChecklist: input.approvalChecklist ?? [],
-    executionMode: "simple",
+    rolloutPlan:
+      input.rolloutPlan ?? "Ship behind a controlled rollout and verify operator-facing acceptance criteria.",
+    testPlan:
+      input.testPlan ?? "Run targeted validation, regression checks, and release-health verification before completion.",
+    approvalChecklist:
+      input.approvalChecklist ?? [
+        "Confirm implementation scope matches the idea rationale",
+        "Confirm rollback and release-health checks are defined",
+      ],
+    executionMode: input.executionMode ?? ((input.dependencies?.length ?? 0) > 0 ? "convoy" : "simple"),
     approvalMode: input.approvalMode ?? (input.automationTier === "fullauto" ? "auto_approve" : "manual"),
     automationTier: input.automationTier,
     status: "draft",

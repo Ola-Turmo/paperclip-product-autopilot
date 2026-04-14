@@ -423,6 +423,76 @@ describe("worker integration", () => {
     ).rejects.toThrow("failed health check");
   });
 
+  it("rejects duplicate rollback requests for the same failed check", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertIdea(harness.ctx, createIdea({ ideaId: "idea-rollback", status: "approved" }));
+    const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-rollback",
+      artifactId: "artifact-rollback",
+    });
+    await harness.performAction(ACTION_KEYS.resumeDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+    });
+    const checkpoint = await harness.performAction<{ checkpointId: string }>(ACTION_KEYS.createCheckpoint, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+    });
+    const check = await harness.performAction<{ checkId: string }>(ACTION_KEYS.createReleaseHealthCheck, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkType: "smoke_test",
+      name: "Smoke",
+    });
+    await harness.performAction(ACTION_KEYS.updateReleaseHealthStatus, {
+      companyId: "company-1",
+      projectId: "project-1",
+      checkId: check.checkId,
+      status: "failed",
+      errorMessage: "boom",
+    });
+
+    await harness.performAction(ACTION_KEYS.triggerRollback, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkId: check.checkId,
+      rollbackType: "restore_checkpoint",
+      checkpointId: checkpoint.checkpointId,
+    });
+
+    await expect(
+      harness.performAction(ACTION_KEYS.triggerRollback, {
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: run.runId,
+        checkId: check.checkId,
+        rollbackType: "restore_checkpoint",
+        checkpointId: checkpoint.checkpointId,
+      }),
+    ).rejects.toThrow("already pending");
+  });
+
+  it("rejects cyclic convoy decompositions", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+
+    await expect(
+      harness.performAction(ACTION_KEYS.decomposeIntoConvoyTasks, {
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-cycle",
+        artifactId: "artifact-cycle",
+        taskTitles: ["A", "B"],
+        dependencies: [["1"], ["0"]],
+      }),
+    ).rejects.toThrow("cannot contain cycles");
+  });
+
   it("dismisses digests through the digest state machine", async () => {
     await upsertAutopilotProject(harness.ctx, createProject());
     await upsertCompanyBudget(harness.ctx, createBudget());
@@ -513,8 +583,10 @@ describe("worker integration", () => {
         "research_cycle.started",
         "research_finding.added",
         "research_cycle.completed",
+        "research_cycle.duration_ms",
         "delivery_run.created",
         "delivery_run.completed",
+        "delivery_run.duration_ms",
         "operator_intervention.created",
         "digest.dismissed",
       ]),

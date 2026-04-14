@@ -32,7 +32,8 @@ import {
   shouldReleaseRunResources,
   updateDeliveryRunStatus,
 } from "../services/delivery.js";
-import { recordAutopilotEvent } from "../services/observability.js";
+import { validateConvoyDependencies, validateDeliveryRunCreation, validatePlanningArtifactInvariant } from "../services/invariants.js";
+import { recordAutopilotDurationMetric, recordAutopilotEvent } from "../services/observability.js";
 import { shouldPauseForBudget } from "../services/policy.js";
 import { transitionConvoyTask } from "../services/state-machines.js";
 import {
@@ -55,7 +56,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       rolloutPlan?: string;
       testPlan?: string;
       approvalChecklist?: string[];
-      executionMode?: Idea["complexityEstimate"];
+      executionMode?: "simple" | "convoy";
       approvalMode?: "manual" | "auto_approve";
     };
     const idea = await repo.getIdea(a.companyId, a.projectId, a.ideaId);
@@ -76,8 +77,10 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       rolloutPlan: a.rolloutPlan,
       testPlan: a.testPlan,
       approvalChecklist: a.approvalChecklist,
+      executionMode: a.executionMode,
       approvalMode: a.approvalMode,
     });
+    validatePlanningArtifactInvariant(artifact);
     await repo.upsertPlanningArtifact(artifact);
     return artifact;
   });
@@ -93,13 +96,11 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
     };
     const idea = await repo.getIdea(a.companyId, a.projectId, a.ideaId);
     if (!idea) throw new Error("Idea not found");
-    if (idea.status !== "approved" && idea.status !== "in_progress") {
-      throw new Error(`Delivery run requires an approved idea, got ${idea.status}`);
-    }
 
     const autopilot = await repo.getAutopilotProject(a.companyId, a.projectId);
     const runId = newId();
     const branchName = generateBranchName(a.projectId, a.ideaId);
+    const activeLock = await repo.getActiveProductLock(a.projectId, branchName);
     const port = allocatePort();
     const createdAt = nowIso();
 
@@ -116,6 +117,11 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       leasedPort: port,
       createdAt,
       title: a.title,
+    });
+    validateDeliveryRunCreation({
+      run,
+      ideaStatus: idea.status,
+      activeLock,
     });
     await repo.upsertDeliveryRun(run);
 
@@ -168,6 +174,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
     };
     const run = await repo.getDeliveryRun(a.companyId, a.projectId, a.runId);
     if (!run) throw new Error("Delivery run not found");
+    const completedAt = nowIso();
 
     const updated = updateDeliveryRunStatus({
       run,
@@ -175,19 +182,19 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       commitSha: a.commitSha,
       prUrl: a.prUrl,
       error: a.error,
-      updatedAt: nowIso(),
+      updatedAt: completedAt,
     });
     await repo.upsertDeliveryRun(updated);
 
     if (shouldReleaseRunResources(a.status)) {
       const lease = await repo.getActiveWorkspaceLease(a.projectId, a.runId);
       if (lease) {
-        await repo.upsertWorkspaceLease(buildReleasedLease(lease, nowIso()));
+        await repo.upsertWorkspaceLease(buildReleasedLease(lease, completedAt));
       }
       const locks = await repo.listProductLocks(a.companyId, a.projectId);
       const activeLock = locks.find((candidate) => candidate.runId === a.runId && candidate.isActive);
       if (activeLock) {
-        await repo.upsertProductLock(buildReleasedLock(activeLock, nowIso()));
+        await repo.upsertProductLock(buildReleasedLock(activeLock, completedAt));
       }
     }
 
@@ -197,6 +204,17 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
         runId: a.runId,
         status: a.status,
       });
+      await recordAutopilotDurationMetric(
+        ctx,
+        "delivery_run.duration_ms",
+        a.companyId,
+        Math.max(0, new Date(completedAt).getTime() - new Date(run.createdAt).getTime()),
+        {
+          projectId: a.projectId,
+          runId: a.runId,
+          status: a.status,
+        },
+      );
     }
 
     return updated;
@@ -269,6 +287,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       taskTitles: string[];
       dependencies?: string[][];
     };
+    validateConvoyDependencies({ taskTitles: a.taskTitles, dependencies: a.dependencies });
     const tasks: ConvoyTask[] = a.taskTitles.map((title, index) => ({
       taskId: newId(),
       companyId: a.companyId,

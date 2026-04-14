@@ -16,7 +16,7 @@ import {
   nowIso,
 } from "../helpers.js";
 import { createAutopilotRepository } from "../repositories/autopilot.js";
-import { recordAutopilotEvent } from "../services/observability.js";
+import { recordAutopilotDurationMetric, recordAutopilotEvent } from "../services/observability.js";
 import { buildResearchCycleSnapshot, createResearchFindingRecord } from "../services/research.js";
 import { processSwipeDecision } from "../services/orchestration.js";
 import {
@@ -158,13 +158,14 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
     if (!cycle) throw new Error("Research cycle not found");
 
     const findings = await repo.listResearchFindings(a.companyId, a.projectId, a.cycleId);
+    const completedAt = nowIso();
     const updated: ResearchCycle = {
       ...cycle,
       status: "completed",
       reportContent: a.reportContent,
       findingsCount: findings.length,
-      snapshot: buildResearchCycleSnapshot(findings, nowIso()),
-      completedAt: nowIso(),
+      snapshot: buildResearchCycleSnapshot(findings, completedAt),
+      completedAt,
     };
     await repo.upsertResearchCycle(updated);
     await recordAutopilotEvent(ctx, "researchCycleCompleted", a.companyId, {
@@ -172,6 +173,16 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       cycleId: a.cycleId,
       findingCount: String(findings.length),
     });
+    await recordAutopilotDurationMetric(
+      ctx,
+      "research_cycle.duration_ms",
+      a.companyId,
+      Math.max(0, new Date(completedAt).getTime() - new Date(cycle.startedAt).getTime()),
+      {
+        projectId: a.projectId,
+        cycleId: a.cycleId,
+      },
+    );
     return updated;
   });
 

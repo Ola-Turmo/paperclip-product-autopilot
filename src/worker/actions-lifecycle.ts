@@ -13,7 +13,9 @@ import {
   validateCheckpointRestore,
   updateReleaseHealthCheck,
 } from "../services/lifecycle.js";
+import { validateRollbackRequest } from "../services/invariants.js";
 import { recordLifecycleSignals } from "../services/observability.js";
+import { resolveRollbackRequest } from "../services/rollback-policy.js";
 
 export function registerLifecycleActionHandlers(ctx: PluginContext) {
   const repo = createAutopilotRepository(ctx);
@@ -114,28 +116,52 @@ export function registerLifecycleActionHandlers(ctx: PluginContext) {
 
   ctx.actions.register(ACTION_KEYS.triggerRollback, async (args) => {
     const a = args as { companyId: string; projectId: string; runId: string; checkId: string; rollbackType: string; targetCommitSha?: string; checkpointId?: string };
+    const run = await repo.getDeliveryRun(a.companyId, a.projectId, a.runId);
+    if (!run) throw new Error("Delivery run not found");
     const checks = await repo.listReleaseHealthChecks(a.companyId, a.projectId, a.runId);
     const check = checks.find((candidate) => candidate.checkId === a.checkId);
     if (!check) throw new Error("Health check not found");
     if (!canTriggerRollback(check)) {
       throw new Error(`Rollback can only be triggered from a failed health check, got ${check.status}`);
     }
+    const checkpoints = await repo.listCheckpoints(a.companyId, a.projectId, a.runId);
+    const existingRollbacks = await repo.listRollbackActions(a.companyId, a.projectId, a.runId);
+    const resolved = resolveRollbackRequest({
+      run,
+      check,
+      checkpoints,
+      requestedRollbackType: a.rollbackType as RollbackAction["rollbackType"],
+      targetCommitSha: a.targetCommitSha,
+      checkpointId: a.checkpointId,
+    });
+    const checkpoint =
+      resolved.checkpointId
+        ? checkpoints.find((candidate) => candidate.checkpointId === resolved.checkpointId)
+        : undefined;
+    validateRollbackRequest({
+      run,
+      check,
+      existingRollbacks,
+      rollbackType: resolved.rollbackType,
+      checkpoint,
+      targetCommitSha: resolved.targetCommitSha,
+    });
     const rollback = buildRollbackAction({
       rollbackId: newId(),
       companyId: a.companyId,
       projectId: a.projectId,
       runId: a.runId,
       checkId: a.checkId,
-      rollbackType: a.rollbackType as RollbackAction["rollbackType"],
-      targetCommitSha: a.targetCommitSha,
-      checkpointId: a.checkpointId,
+      rollbackType: resolved.rollbackType,
+      targetCommitSha: resolved.targetCommitSha,
+      checkpointId: resolved.checkpointId,
       createdAt: nowIso(),
     });
     await repo.upsertRollbackAction(rollback);
     await recordLifecycleSignals(ctx, "rollback_triggered", a.companyId, "rollback.triggered", 1, {
       projectId: a.projectId,
       runId: a.runId,
-      rollbackType: a.rollbackType,
+      rollbackType: rollback.rollbackType,
     });
     return rollback;
   });

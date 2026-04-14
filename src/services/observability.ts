@@ -15,6 +15,21 @@ export async function recordAutopilotEvent(
   });
 }
 
+export async function recordAutopilotDurationMetric(
+  ctx: PluginContext,
+  metricName: string,
+  companyId: string,
+  durationMs: number,
+  tags?: Record<string, string>,
+) {
+  await ctx.metrics.write(metricName, durationMs, tags);
+  await ctx.telemetry.track(`${metricName}.recorded`, {
+    companyId,
+    durationMs,
+    ...(tags ?? {}),
+  });
+}
+
 export async function recordLifecycleSignals(
   ctx: PluginContext,
   eventName: string,
