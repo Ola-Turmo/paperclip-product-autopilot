@@ -370,6 +370,7 @@ describe("worker integration", () => {
     const reopenedDigests = digestsAfterReopen.filter((digest) => digest.data.digestType === "stuck_run");
     expect(reopenedDigests).toHaveLength(2);
     expect(reopenedDigests.some((digest) => Number(digest.data.reopenCount ?? 0) > 0)).toBe(true);
+    expect(reopenedDigests.some((digest) => Number(digest.data.escalationLevel ?? 0) > 0)).toBe(true);
   });
 
   it("emits metrics and telemetry for checkpoint, health-check, and rollback actions", async () => {

@@ -392,6 +392,7 @@ export const digestSchema = z.object({
   projectId: z.string().min(1),
   digestType: digestTypeSchema,
   dedupeKey: z.string().optional(),
+  escalationLevel: z.number().int().nonnegative().optional(),
   title: z.string().min(1),
   summary: z.string().min(1),
   details: z.array(z.string()),

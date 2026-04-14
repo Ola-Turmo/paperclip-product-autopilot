@@ -349,6 +349,7 @@ export interface Digest {
   projectId: string;
   digestType: DigestType;
   dedupeKey?: string;
+  escalationLevel?: number;
   title: string;
   summary: string;
   details: string[];

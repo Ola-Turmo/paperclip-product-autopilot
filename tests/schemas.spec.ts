@@ -137,6 +137,7 @@ describe("runtime schemas", () => {
         projectId: "project-1",
         digestType: "stuck_run",
         dedupeKey: "stuck_run:run-1",
+        escalationLevel: 1,
         title: "Stuck",
         summary: "Run stuck",
         details: [],

@@ -74,6 +74,36 @@ describe("digest policy", () => {
     expect(reopened.shouldCreate).toBe(true);
     expect(reopened.reason).toBe("reopened_after_cooldown");
     expect(reopened.candidate.reopenCount).toBe(1);
+    expect(reopened.candidate.escalationLevel).toBe(1);
+    expect(reopened.candidate.priority).toBe("critical");
+  });
+
+  it("escalates repeated reopened digests more aggressively over time", () => {
+    const dismissed = applyDigestDismissalCooldown(
+      createDigest({
+        digestId: "dismissed-escalated",
+        status: "dismissed",
+        dismissedAt: "2026-01-01T01:00:00.000Z",
+        reopenCount: 2,
+        escalationLevel: 1,
+      }),
+      "2026-01-01T01:00:00.000Z",
+    );
+
+    const reopened = evaluateDigestCreationPolicy(
+      [dismissed],
+      createDigest({
+        digestId: "candidate-escalated",
+        createdAt: "2026-01-01T08:00:00.000Z",
+        priority: "medium",
+      }),
+      "2026-01-01T08:00:00.000Z",
+    );
+
+    expect(reopened.shouldCreate).toBe(true);
+    expect(reopened.candidate.reopenCount).toBe(3);
+    expect(reopened.candidate.escalationLevel).toBe(2);
+    expect(reopened.candidate.priority).toBe("critical");
   });
 
   it("evaluates digest policy replay accuracy", () => {

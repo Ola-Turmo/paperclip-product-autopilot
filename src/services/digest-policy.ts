@@ -16,6 +16,8 @@ const PRIORITY_WEIGHT: Record<Digest["priority"], number> = {
   critical: 4,
 };
 
+const PRIORITIES: Digest["priority"][] = ["low", "medium", "high", "critical"];
+
 export function buildDigestDedupeKey(input: {
   digestType: Digest["digestType"];
   relatedRunId?: string;
@@ -55,6 +57,18 @@ export function applyDigestDismissalCooldown(digest: Digest, dismissedAt: string
     ...digest,
     cooldownUntil: getDigestCooldownUntil(digest, dismissedAt),
   };
+}
+
+function escalateDigestPriority(priority: Digest["priority"], escalationLevel: number): Digest["priority"] {
+  const currentIndex = PRIORITIES.indexOf(priority);
+  const nextIndex = Math.min(PRIORITIES.length - 1, currentIndex + escalationLevel);
+  return PRIORITIES[nextIndex] ?? priority;
+}
+
+function getEscalationLevel(reopenCount: number): number {
+  if (reopenCount >= 3) return 2;
+  if (reopenCount >= 1) return 1;
+  return 0;
 }
 
 export function evaluateDigestCreationPolicy(
@@ -97,18 +111,32 @@ export function evaluateDigestCreationPolicy(
     return {
       shouldCreate: true,
       reason: "reopened_after_cooldown",
-      candidate: {
-        ...candidate,
-        dedupeKey,
-        reopenCount: (dismissedDigest.reopenCount ?? 0) + 1,
-      },
+      candidate: (() => {
+        const reopenCount = (dismissedDigest.reopenCount ?? 0) + 1;
+        const escalationLevel = Math.max(
+          dismissedDigest.escalationLevel ?? 0,
+          getEscalationLevel(reopenCount),
+        );
+        return {
+          ...candidate,
+          dedupeKey,
+          reopenCount,
+          escalationLevel,
+          priority: escalateDigestPriority(candidate.priority, escalationLevel),
+        };
+      })(),
     };
   }
 
   return {
     shouldCreate: true,
     reason: "create",
-    candidate: { ...candidate, dedupeKey, reopenCount: candidate.reopenCount ?? 0 },
+    candidate: {
+      ...candidate,
+      dedupeKey,
+      reopenCount: candidate.reopenCount ?? 0,
+      escalationLevel: candidate.escalationLevel ?? 0,
+    },
   };
 }
 
