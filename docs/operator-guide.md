@@ -22,6 +22,9 @@
 - Checkpoints capture resumable execution state.
 - Failed release-health checks are the trigger point for rollback actions.
 - Duplicate rollback requests for the same failed check are rejected.
+- `merge_lock` acquisition requires an explicit governance note.
+- `full_rollback` requires explicit operator acknowledgment plus a governance note.
+- Auto-approved plans are limited to `fullauto` mode and cannot be convoy or high-complexity plans.
 
 ## Auditability
 

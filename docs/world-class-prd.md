@@ -515,8 +515,8 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [~] Add release-health aggregation logic across multiple checks.
 - [~] Add digest escalation and suppression policy.
 - [~] Add reopen rules, cooldown windows, and dedupe keys for digests.
-- [ ] Add explicit policy gates for destructive or risky actions.
-- [ ] Define full-auto boundaries that remain hard-coded supervised.
+- [~] Add explicit policy gates for destructive or risky actions.
+- [~] Define full-auto boundaries that remain hard-coded supervised.
 - [~] Document governance policy in the repo, not just in code.
 
 ### 16.9 Observability and evaluation
@@ -542,7 +542,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [~] Add clearer intervention workflows for pause, resume, checkpoint, rollback, and note-taking.
 - [ ] Add budget and digest management surfaces.
 - [ ] Add better empty states, loading states, and error states.
-- [ ] Add UI smoke tests.
+- [~] Add UI smoke tests.
 - [ ] Add run-detail and health-check UX that exposes decision context, not just raw records.
 
 ### 16.11 Testing and verification
@@ -550,7 +550,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [x] Add unit and integration coverage for the current baseline.
 - [x] Add transition-matrix tests for state machines.
 - [x] Add repository contract tests.
-- [ ] Add UI smoke tests.
+- [~] Add UI smoke tests.
 - [ ] Add more worker integration tests around rollback, checkpoint restore, release-health aggregation, and digest escalation.
 - [ ] Add fixture-driven tests for ranking and duplicate detection.
 - [x] Add package-install validation in CI from a clean environment.

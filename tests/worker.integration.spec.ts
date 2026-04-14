@@ -544,6 +544,85 @@ describe("worker integration", () => {
     ).rejects.toThrow("cannot contain cycles");
   });
 
+  it("enforces governance gates on risky planning and lock actions", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject({ automationTier: "semiauto" }));
+    await upsertIdea(
+      harness.ctx,
+      createIdea({
+        ideaId: "idea-governance",
+        status: "approved",
+        complexityEstimate: "high",
+      }),
+    );
+
+    await expect(
+      harness.performAction(ACTION_KEYS.createPlanningArtifact, {
+        companyId: "company-1",
+        projectId: "project-1",
+        ideaId: "idea-governance",
+        approvalMode: "auto_approve",
+        executionMode: "simple",
+      }),
+    ).rejects.toThrow("fullauto mode");
+
+    await expect(
+      harness.performAction(ACTION_KEYS.acquireProductLock, {
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-merge-lock",
+        lockType: "merge_lock",
+        targetBranch: "main",
+      }),
+    ).rejects.toThrow("governance note");
+  });
+
+  it("requires explicit acknowledgment for full rollback", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertIdea(harness.ctx, createIdea({ ideaId: "idea-full-rollback", status: "approved" }));
+    const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-full-rollback",
+      artifactId: "artifact-full-rollback",
+    });
+    const check = await harness.performAction<{ checkId: string }>(ACTION_KEYS.createReleaseHealthCheck, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkType: "smoke_test",
+      name: "Smoke",
+    });
+    await harness.performAction(ACTION_KEYS.updateReleaseHealthStatus, {
+      companyId: "company-1",
+      projectId: "project-1",
+      checkId: check.checkId,
+      status: "failed",
+      errorMessage: "boom",
+    });
+
+    await expect(
+      harness.performAction(ACTION_KEYS.triggerRollback, {
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: run.runId,
+        checkId: check.checkId,
+        rollbackType: "full_rollback",
+      }),
+    ).rejects.toThrow("operator acknowledgment");
+
+    const rollback = await harness.performAction<{ rollbackType: string }>(ACTION_KEYS.triggerRollback, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkId: check.checkId,
+      rollbackType: "full_rollback",
+      governanceNote: "Customer-visible failure requires immediate rollback",
+      operatorAcknowledged: true,
+    });
+
+    expect(rollback.rollbackType).toBe("full_rollback");
+  });
+
   it("dismisses digests through the digest state machine", async () => {
     await upsertAutopilotProject(harness.ctx, createProject());
     await upsertCompanyBudget(harness.ctx, createBudget());

@@ -32,6 +32,7 @@ import {
   shouldReleaseRunResources,
   updateDeliveryRunStatus,
 } from "../services/delivery.js";
+import { requireGovernancePolicy } from "../services/governance.js";
 import { validateConvoyDependencies, validateDeliveryRunCreation, validatePlanningArtifactInvariant } from "../services/invariants.js";
 import { recordAutopilotDurationMetric, recordAutopilotEvent } from "../services/observability.js";
 import { shouldPauseForBudget } from "../services/policy.js";
@@ -80,6 +81,14 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       executionMode: a.executionMode,
       approvalMode: a.approvalMode,
     });
+    if (artifact.approvalMode === "auto_approve") {
+      requireGovernancePolicy({
+        action: "auto_approve_plan",
+        automationTier: artifact.automationTier,
+        executionMode: artifact.executionMode,
+        complexityEstimate: idea.complexityEstimate,
+      });
+    }
     validatePlanningArtifactInvariant(artifact);
     await repo.upsertPlanningArtifact(artifact);
     return artifact;
@@ -348,6 +357,12 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       targetPath?: string;
       blockReason?: string;
     };
+    if (a.lockType === "merge_lock") {
+      requireGovernancePolicy({
+        action: "merge_lock",
+        governanceNote: a.blockReason,
+      });
+    }
     const existing = await repo.getActiveProductLock(a.projectId, a.targetBranch);
     if (existing) throw new Error(`Branch ${a.targetBranch} is already locked`);
 

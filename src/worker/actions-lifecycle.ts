@@ -13,6 +13,7 @@ import {
   validateCheckpointRestore,
   updateReleaseHealthCheck,
 } from "../services/lifecycle.js";
+import { requireGovernancePolicy } from "../services/governance.js";
 import { validateRollbackRequest } from "../services/invariants.js";
 import { recordLifecycleSignals } from "../services/observability.js";
 import { resolveRollbackRequest } from "../services/rollback-policy.js";
@@ -115,7 +116,17 @@ export function registerLifecycleActionHandlers(ctx: PluginContext) {
   });
 
   ctx.actions.register(ACTION_KEYS.triggerRollback, async (args) => {
-    const a = args as { companyId: string; projectId: string; runId: string; checkId: string; rollbackType: string; targetCommitSha?: string; checkpointId?: string };
+    const a = args as {
+      companyId: string;
+      projectId: string;
+      runId: string;
+      checkId: string;
+      rollbackType: string;
+      targetCommitSha?: string;
+      checkpointId?: string;
+      governanceNote?: string;
+      operatorAcknowledged?: boolean;
+    };
     const run = await repo.getDeliveryRun(a.companyId, a.projectId, a.runId);
     if (!run) throw new Error("Delivery run not found");
     const checks = await repo.listReleaseHealthChecks(a.companyId, a.projectId, a.runId);
@@ -138,6 +149,13 @@ export function registerLifecycleActionHandlers(ctx: PluginContext) {
       resolved.checkpointId
         ? checkpoints.find((candidate) => candidate.checkpointId === resolved.checkpointId)
         : undefined;
+    if (resolved.rollbackType === "full_rollback") {
+      requireGovernancePolicy({
+        action: "full_rollback",
+        governanceNote: a.governanceNote,
+        operatorAcknowledged: a.operatorAcknowledged,
+      });
+    }
     validateRollbackRequest({
       run,
       check,
