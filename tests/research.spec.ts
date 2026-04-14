@@ -5,6 +5,7 @@ import {
   computeSourceQualityScore,
   createResearchFindingRecord,
   findDuplicateResearchFinding,
+  normalizeResearchSignalInput,
 } from "../src/services/research.js";
 
 function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFinding {
@@ -48,6 +49,8 @@ describe("research service", () => {
     });
 
     expect(finding.signalFamily).toBe("support");
+    expect(finding.sourceType).toBe("support_ticket");
+    expect(finding.ingestedAt).toBeTruthy();
     expect(finding.topic).toContain("onboarding");
     expect(finding.sourceQualityScore).toBeGreaterThan(50);
     expect(finding.freshnessScore).toBeGreaterThan(50);
@@ -66,6 +69,19 @@ describe("research service", () => {
 
     expect(fresh).toBeGreaterThan(stale);
     expect(strongSource).toBeGreaterThan(weakSource);
+  });
+
+  it("normalizes source ingestion metadata into a stable contract", () => {
+    const normalized = normalizeResearchSignalInput({
+      title: "Improve onboarding completion",
+      description: "Users drop before activation",
+      sourceUrl: "https://analytics.example.com/dashboard/1",
+      category: "user_feedback",
+    });
+
+    expect(normalized.sourceType).toBe("analytics_report");
+    expect(normalized.sourceLabel).toContain("analytics");
+    expect(normalized.ingestedAt).toBeTruthy();
   });
 
   it("detects duplicate findings from normalized topic/title similarity", () => {

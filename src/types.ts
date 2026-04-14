@@ -90,6 +90,17 @@ export interface ResearchFinding {
   description: string;
   sourceUrl?: string;
   sourceLabel?: string;
+  sourceType?:
+    | "support_ticket"
+    | "analytics_report"
+    | "competitor_note"
+    | "incident_postmortem"
+    | "survey_response"
+    | "code_signal"
+    | "custom";
+  sourceId?: string;
+  sourceTimestamp?: string;
+  ingestedAt?: string;
   evidenceText?: string;
   signalFamily?: "support" | "analytics" | "market" | "incident" | "qualitative" | "technical";
   topic?: string;

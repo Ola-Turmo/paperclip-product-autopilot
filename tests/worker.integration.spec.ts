@@ -704,6 +704,9 @@ describe("worker integration", () => {
       description: "Users drop before activation",
       sourceUrl: "https://example.com/support",
       sourceLabel: "support-summary",
+      sourceType: "support_ticket",
+      sourceId: "ticket-123",
+      sourceTimestamp: "2026-01-01T00:00:00.000Z",
       category: "user_feedback",
       confidence: 0.91,
       evidenceText: "Support tickets highlight onboarding confusion.",
@@ -849,6 +852,35 @@ describe("worker integration", () => {
     expect(first.duplicateAnnotated).toBe(false);
     expect(second.duplicateAnnotated).toBe(true);
     expect(second.duplicateOfFindingId).toBe(first.findingId);
+  });
+
+  it("stores normalized research provenance metadata through the action path", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertResearchCycle(harness.ctx, createResearchCycle());
+
+    const finding = await harness.performAction<{
+      sourceType: string;
+      sourceId?: string;
+      sourceTimestamp?: string;
+      ingestedAt?: string;
+    }>(ACTION_KEYS.addResearchFinding, {
+      companyId: "company-1",
+      projectId: "project-1",
+      cycleId: "cycle-1",
+      title: "Investigate activation funnel drop",
+      description: "Analytics report shows a steep signup drop-off",
+      sourceUrl: "https://analytics.example.com/dashboard/activation",
+      sourceType: "analytics_report",
+      sourceId: "analytics-report-1",
+      sourceTimestamp: "2026-01-01T00:00:00.000Z",
+      category: "user_feedback",
+      confidence: 0.88,
+    });
+
+    expect(finding.sourceType).toBe("analytics_report");
+    expect(finding.sourceId).toBe("analytics-report-1");
+    expect(finding.sourceTimestamp).toBe("2026-01-01T00:00:00.000Z");
+    expect(finding.ingestedAt).toBeTruthy();
   });
 
   it("captures a reproducible snapshot when a research cycle completes", async () => {

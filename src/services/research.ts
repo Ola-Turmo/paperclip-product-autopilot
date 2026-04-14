@@ -1,5 +1,24 @@
 import type { ResearchFinding } from "../types.js";
 
+export interface ResearchSignalInput {
+  title: string;
+  description: string;
+  sourceUrl?: string;
+  sourceLabel?: string;
+  sourceType?:
+    | "support_ticket"
+    | "analytics_report"
+    | "competitor_note"
+    | "incident_postmortem"
+    | "survey_response"
+    | "code_signal"
+    | "custom";
+  sourceId?: string;
+  sourceTimestamp?: string;
+  evidenceText?: string;
+  category?: ResearchFinding["category"];
+}
+
 function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
@@ -47,6 +66,7 @@ export function computeFindingFreshnessScore(createdAt: string, now = new Date()
 export function computeSourceQualityScore(input: {
   sourceUrl?: string;
   sourceLabel?: string;
+  sourceType?: ResearchFinding["sourceType"];
   evidenceText?: string;
 }): number {
   let score = 35;
@@ -69,6 +89,13 @@ export function computeSourceQualityScore(input: {
   if (label.includes("support")) score += 8;
   if (label.includes("user")) score += 6;
 
+  if (input.sourceType === "support_ticket") score += 8;
+  if (input.sourceType === "analytics_report") score += 10;
+  if (input.sourceType === "incident_postmortem") score += 11;
+  if (input.sourceType === "survey_response") score += 7;
+  if (input.sourceType === "competitor_note") score += 6;
+  if (input.sourceType === "code_signal") score += 9;
+
   return clampScore(score);
 }
 
@@ -76,10 +103,17 @@ export function inferSignalFamily(input: {
   category?: ResearchFinding["category"];
   sourceUrl?: string;
   sourceLabel?: string;
+  sourceType?: ResearchFinding["sourceType"];
 }): ResearchFinding["signalFamily"] {
   const url = input.sourceUrl?.toLowerCase() ?? "";
   const label = input.sourceLabel?.toLowerCase() ?? "";
 
+  if (input.sourceType === "incident_postmortem") return "incident";
+  if (input.sourceType === "analytics_report") return "analytics";
+  if (input.sourceType === "support_ticket") return "support";
+  if (input.sourceType === "competitor_note") return "market";
+  if (input.sourceType === "code_signal") return "technical";
+  if (input.sourceType === "survey_response") return "qualitative";
   if (url.includes("status") || label.includes("incident")) return "incident";
   if (url.includes("analytics") || label.includes("analytics")) return "analytics";
   if (url.includes("support") || label.includes("support")) return "support";
@@ -101,6 +135,32 @@ export function inferTopic(input: {
   return input.category ?? "general";
 }
 
+export function normalizeResearchSignalInput(input: ResearchSignalInput): Required<Pick<ResearchFinding, "sourceType" | "sourceLabel" | "ingestedAt">> & Pick<ResearchFinding, "sourceUrl" | "sourceId" | "sourceTimestamp"> {
+  const sourceType = input.sourceType ?? inferSourceType(input);
+  const sourceLabel = input.sourceLabel ?? sourceType.replace(/_/g, " ");
+  return {
+    sourceType,
+    sourceLabel,
+    sourceUrl: input.sourceUrl,
+    sourceId: input.sourceId,
+    sourceTimestamp: input.sourceTimestamp,
+    ingestedAt: new Date().toISOString(),
+  };
+}
+
+function inferSourceType(input: Pick<ResearchSignalInput, "sourceUrl" | "sourceLabel" | "category">): NonNullable<ResearchFinding["sourceType"]> {
+  const url = input.sourceUrl?.toLowerCase() ?? "";
+  const label = input.sourceLabel?.toLowerCase() ?? "";
+
+  if (url.includes("analytics") || label.includes("analytics")) return "analytics_report";
+  if (url.includes("support") || label.includes("support")) return "support_ticket";
+  if (url.includes("status") || label.includes("incident")) return "incident_postmortem";
+  if (url.includes("github") || label.includes("repo") || input.category === "technical") return "code_signal";
+  if (label.includes("survey") || label.includes("interview") || label.includes("feedback")) return "survey_response";
+  if (input.category === "competitive" || url.includes("competitor")) return "competitor_note";
+  return "custom";
+}
+
 export function createResearchFindingRecord(input: {
   findingId: string;
   companyId: string;
@@ -112,11 +172,19 @@ export function createResearchFindingRecord(input: {
   createdAt: string;
   sourceUrl?: string;
   sourceLabel?: string;
+  sourceType?: ResearchFinding["sourceType"];
+  sourceId?: string;
+  sourceTimestamp?: string;
   evidenceText?: string;
   category?: ResearchFinding["category"];
 }): ResearchFinding {
+  const normalizedSignal = normalizeResearchSignalInput(input);
   const topic = inferTopic(input);
-  const signalFamily = inferSignalFamily(input);
+  const signalFamily = inferSignalFamily({
+    ...input,
+    sourceType: normalizedSignal.sourceType,
+    sourceLabel: normalizedSignal.sourceLabel,
+  });
   const dedupeKey = `${topic}|${normalizeText(input.title).slice(0, 80)}`;
 
   return {
@@ -126,15 +194,23 @@ export function createResearchFindingRecord(input: {
     cycleId: input.cycleId,
     title: input.title,
     description: input.description,
-    sourceUrl: input.sourceUrl,
-    sourceLabel: input.sourceLabel,
+    sourceUrl: normalizedSignal.sourceUrl,
+    sourceLabel: normalizedSignal.sourceLabel,
+    sourceType: normalizedSignal.sourceType,
+    sourceId: normalizedSignal.sourceId,
+    sourceTimestamp: normalizedSignal.sourceTimestamp,
+    ingestedAt: normalizedSignal.ingestedAt,
     evidenceText: input.evidenceText,
     signalFamily,
     topic,
     dedupeKey,
     category: input.category,
     confidence: input.confidence,
-    sourceQualityScore: computeSourceQualityScore(input),
+    sourceQualityScore: computeSourceQualityScore({
+      ...input,
+      sourceType: normalizedSignal.sourceType,
+      sourceLabel: normalizedSignal.sourceLabel,
+    }),
     freshnessScore: computeFindingFreshnessScore(input.createdAt),
     duplicateAnnotated: false,
     createdAt: input.createdAt,

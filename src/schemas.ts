@@ -20,6 +20,15 @@ const interventionTypeSchema = z.enum(["note", "checkpoint_request", "nudge", "l
 const lockTypeSchema = z.enum(["product_lock", "merge_lock"]);
 const knowledgeTypeSchema = z.enum(["procedure", "pattern", "lesson", "skill"]);
 const signalFamilySchema = z.enum(["support", "analytics", "market", "incident", "qualitative", "technical"]);
+const sourceTypeSchema = z.enum([
+  "support_ticket",
+  "analytics_report",
+  "competitor_note",
+  "incident_postmortem",
+  "survey_response",
+  "code_signal",
+  "custom",
+]);
 const digestStatusSchema = z.enum(["pending", "delivered", "read", "dismissed"]);
 const digestPrioritySchema = z.enum(["low", "medium", "high", "critical"]);
 const digestTypeSchema = z.enum([
@@ -91,6 +100,10 @@ export const researchFindingSchema = z.object({
   description: z.string().min(1),
   sourceUrl: z.string().optional(),
   sourceLabel: z.string().optional(),
+  sourceType: sourceTypeSchema.optional(),
+  sourceId: z.string().optional(),
+  sourceTimestamp: z.string().optional(),
+  ingestedAt: z.string().optional(),
   evidenceText: z.string().optional(),
   signalFamily: signalFamilySchema.optional(),
   topic: z.string().optional(),
@@ -105,6 +118,9 @@ export const researchFindingSchema = z.object({
 }).superRefine((finding, ctx) => {
   if (finding.duplicateAnnotated && !finding.duplicateOfFindingId) {
     ctx.addIssue({ code: "custom", message: "duplicate findings must reference duplicateOfFindingId", path: ["duplicateOfFindingId"] });
+  }
+  if (finding.sourceType && !finding.ingestedAt) {
+    ctx.addIssue({ code: "custom", message: "typed research findings must include ingestedAt", path: ["ingestedAt"] });
   }
 });
 

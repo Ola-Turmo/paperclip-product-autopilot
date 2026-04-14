@@ -196,6 +196,9 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       confidence?: number;
       sourceUrl?: string;
       sourceLabel?: string;
+      sourceType?: ResearchFinding["sourceType"];
+      sourceId?: string;
+      sourceTimestamp?: string;
       evidenceText?: string;
       category?: ResearchFinding["category"];
     };
@@ -209,6 +212,9 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       confidence: a.confidence ?? 0.7,
       sourceUrl: a.sourceUrl,
       sourceLabel: a.sourceLabel,
+      sourceType: a.sourceType,
+      sourceId: a.sourceId,
+      sourceTimestamp: a.sourceTimestamp,
       evidenceText: a.evidenceText,
       category: a.category,
       createdAt: nowIso(),

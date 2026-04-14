@@ -471,7 +471,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 
 ### 16.4 Research intelligence
 
-- [ ] Define signal-ingestion interfaces for research inputs.
+- [~] Define signal-ingestion interfaces for research inputs.
 - [~] Add first-class provenance fields and source-quality scoring.
 - [~] Add freshness and confidence policies for findings.
 - [~] Add deduplication for research findings, not just ideas.
