@@ -14,6 +14,7 @@ import type {
   AutopilotOverview,
   AutopilotProject,
   Checkpoint,
+  CompanyBudget,
   DeliveryRun,
   Digest,
   Idea,
@@ -427,6 +428,91 @@ function RunsCard(props: { companyId: string; projectId: string }) {
   );
 }
 
+function BudgetControlCard(props: { companyId: string; onSaved: () => void }) {
+  const updateBudget = usePluginAction(ACTION_KEYS.updateCompanyBudget);
+  const toast = usePluginToast();
+  const { data: budget } = usePluginData<CompanyBudget>(DATA_KEYS.companyBudget, {
+    companyId: props.companyId,
+  });
+  const [autopilotBudgetMinutes, setAutopilotBudgetMinutes] = useState(120);
+  const [autopilotUsedMinutes, setAutopilotUsedMinutes] = useState(0);
+
+  useEffect(() => {
+    if (!budget) return;
+    setAutopilotBudgetMinutes(budget.autopilotBudgetMinutes);
+    setAutopilotUsedMinutes(budget.autopilotUsedMinutes);
+  }, [budget]);
+
+  const usagePercent =
+    autopilotBudgetMinutes > 0 ? Math.round((autopilotUsedMinutes / autopilotBudgetMinutes) * 100) : 0;
+
+  async function handleSave() {
+    try {
+      await updateBudget({
+        companyId: props.companyId,
+        autopilotBudgetMinutes,
+        autopilotUsedMinutes,
+      });
+      toast({ title: "Budget settings saved", tone: "success" });
+      props.onSaved();
+    } catch (error) {
+      toastError(toast, "Failed to update budget", error);
+    }
+  }
+
+  return (
+    <Section
+      title="Budget Controls"
+      action={<StatusPill status={budget?.paused ? "paused" : usagePercent >= 100 ? "failed" : "active"} />}
+    >
+      <div style={{ display: "grid", gap: 12 }}>
+        <div style={GRID}>
+          <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{usagePercent}%</div>
+            <div style={MUTED}>Autopilot Budget Usage</div>
+          </div>
+          <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{autopilotUsedMinutes}</div>
+            <div style={MUTED}>Used Minutes</div>
+          </div>
+          <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{autopilotBudgetMinutes}</div>
+            <div style={MUTED}>Allowed Minutes</div>
+          </div>
+        </div>
+        <div style={GRID}>
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={LABEL}>Autopilot Budget Minutes</span>
+            <input
+              type="number"
+              value={autopilotBudgetMinutes}
+              onChange={(event) => setAutopilotBudgetMinutes(Number((event.target as HTMLInputElement).value) || 0)}
+              style={INPUT}
+            />
+          </label>
+          <label style={{ display: "grid", gap: 6 }}>
+            <span style={LABEL}>Autopilot Used Minutes</span>
+            <input
+              type="number"
+              value={autopilotUsedMinutes}
+              onChange={(event) => setAutopilotUsedMinutes(Number((event.target as HTMLInputElement).value) || 0)}
+              style={INPUT}
+            />
+          </label>
+        </div>
+        <div style={MUTED}>
+          {budget?.pauseReason ? `Pause reason: ${budget.pauseReason}` : "Use this surface to adjust and inspect operator budget state."}
+        </div>
+        <div>
+          <button onClick={handleSave} style={BUTTON}>
+            Save Budget
+          </button>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 function DigestsCard(props: { companyId: string; projectId: string; onRefresh: () => void }) {
   const dismissDigest = usePluginAction(ACTION_KEYS.dismissDigest);
   const toast = usePluginToast();
@@ -691,6 +777,7 @@ export function AutopilotProjectTab({ context }: PluginDetailTabProps) {
     <div style={PAGE}>
       {overview ? <StatsRow overview={overview} /> : <LoadingState label="overview" />}
       <ProjectSettingsCard companyId={companyId} projectId={projectId} project={project} onSaved={refreshAll} />
+      <BudgetControlCard companyId={companyId} onSaved={refreshAll} />
       <ResearchCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
       <EvaluationCard />
       <LearningCard companyId={companyId} projectId={projectId} />
@@ -826,6 +913,7 @@ export function AutopilotSettings({ context }: PluginSettingsPageProps) {
 
 export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
   const toast = usePluginToast();
+  const cancelRun = usePluginAction(ACTION_KEYS.cancelDeliveryRun);
   const pauseRun = usePluginAction(ACTION_KEYS.pauseDeliveryRun);
   const resumeRun = usePluginAction(ACTION_KEYS.resumeDeliveryRun);
   const requestCheckpoint = usePluginAction(ACTION_KEYS.requestCheckpoint);
@@ -924,6 +1012,21 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
     }
   }
 
+  async function handleCancelRun() {
+    try {
+      await cancelRun({
+        companyId: context.companyId,
+        projectId: context.projectId ?? "",
+        runId: activeRun.runId,
+        reason: operatorNote || "Cancelled by operator",
+      });
+      toast({ title: "Run cancelled", tone: "success" });
+      await refreshRunViews();
+    } catch (error) {
+      toastError(toast, "Failed to cancel run", error);
+    }
+  }
+
   async function handleOperatorNote() {
     if (!operatorNote.trim()) return;
     try {
@@ -948,12 +1051,21 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
         action={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <StatusPill status={activeRun.status} />
-            <button onClick={handlePauseResume} style={BUTTON_SECONDARY}>
-              {activeRun.status === "paused" ? "Resume" : "Pause"}
-            </button>
-            <button onClick={handleCheckpointRequest} style={BUTTON_SECONDARY}>
-              Request Checkpoint
-            </button>
+            {["pending", "running", "paused"].includes(activeRun.status) ? (
+              <button onClick={handlePauseResume} style={BUTTON_SECONDARY}>
+                {activeRun.status === "paused" ? "Resume" : "Pause"}
+              </button>
+            ) : null}
+            {["running", "paused"].includes(activeRun.status) ? (
+              <button onClick={handleCheckpointRequest} style={BUTTON_SECONDARY}>
+                Request Checkpoint
+              </button>
+            ) : null}
+            {["pending", "running", "paused"].includes(activeRun.status) ? (
+              <button onClick={handleCancelRun} style={BUTTON_SECONDARY}>
+                Cancel
+              </button>
+            ) : null}
           </div>
         }
       >
@@ -967,6 +1079,7 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
             <div style={MUTED}>Failure class: {formatFailureCategory(classifyFailureMessage(activeRun.error))}</div>
           ) : null}
           {activeRun.pauseReason ? <div style={MUTED}>Pause reason: {activeRun.pauseReason}</div> : null}
+          {activeRun.cancellationReason ? <div style={MUTED}>Cancellation reason: {activeRun.cancellationReason}</div> : null}
           {activeRun.error ? <div style={{ color: "#dc2626", fontSize: 13 }}>{activeRun.error}</div> : null}
           <label style={{ display: "grid", gap: 6, marginTop: 8 }}>
             <span style={LABEL}>Operator Note</span>

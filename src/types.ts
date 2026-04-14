@@ -200,6 +200,7 @@ export interface DeliveryRun {
   prNumber?: number;
   paused: boolean;
   pauseReason?: string;
+  cancellationReason?: string;
   completedAt: string | null;
   error?: string;
   createdAt: string;

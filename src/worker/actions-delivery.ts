@@ -24,6 +24,7 @@ import {
   buildPlanningArtifact,
   buildProductLock,
   buildWorkspaceLease,
+  cancelDeliveryRun as buildCancelledRun,
   getAutomationTier,
   pauseDeliveryRun as buildPausedRun,
   releaseProductLock as buildReleasedLock,
@@ -191,6 +192,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       commitSha: a.commitSha,
       prUrl: a.prUrl,
       error: a.error,
+      cancellationReason: a.status === "cancelled" ? (a.error ?? "Cancelled") : undefined,
       updatedAt: completedAt,
     });
     await repo.upsertDeliveryRun(updated);
@@ -235,6 +237,43 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
     if (!run) throw new Error("Delivery run not found");
     const updated = buildPausedRun(run, nowIso(), a.reason);
     await repo.upsertDeliveryRun(updated);
+    return updated;
+  });
+
+  ctx.actions.register(ACTION_KEYS.cancelDeliveryRun, async (args) => {
+    const a = args as { companyId: string; projectId: string; runId: string; reason?: string };
+    const run = await repo.getDeliveryRun(a.companyId, a.projectId, a.runId);
+    if (!run) throw new Error("Delivery run not found");
+    const timestamp = nowIso();
+    const updated = buildCancelledRun(run, timestamp, a.reason ?? "Cancelled by operator");
+    await repo.upsertDeliveryRun(updated);
+
+    const lease = await repo.getActiveWorkspaceLease(a.projectId, a.runId);
+    if (lease) {
+      await repo.upsertWorkspaceLease(buildReleasedLease(lease, timestamp));
+    }
+    const locks = await repo.listProductLocks(a.companyId, a.projectId);
+    const activeLock = locks.find((candidate) => candidate.runId === a.runId && candidate.isActive);
+    if (activeLock) {
+      await repo.upsertProductLock(buildReleasedLock(activeLock, timestamp));
+    }
+
+    await recordAutopilotEvent(ctx, "deliveryRunCompleted", a.companyId, {
+      projectId: a.projectId,
+      runId: a.runId,
+      status: "cancelled",
+    });
+    await recordAutopilotDurationMetric(
+      ctx,
+      "delivery_run.duration_ms",
+      a.companyId,
+      Math.max(0, new Date(timestamp).getTime() - new Date(run.createdAt).getTime()),
+      {
+        projectId: a.projectId,
+        runId: a.runId,
+        status: "cancelled",
+      },
+    );
     return updated;
   });
 

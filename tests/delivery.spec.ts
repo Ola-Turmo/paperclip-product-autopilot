@@ -4,6 +4,7 @@ import {
   buildPlanningArtifact,
   buildProductLock,
   buildWorkspaceLease,
+  cancelDeliveryRun,
   getAutomationTier,
   pauseDeliveryRun,
   releaseProductLock,
@@ -144,6 +145,7 @@ describe("delivery services", () => {
     });
     const paused = pauseDeliveryRun(run, "2026-01-03T01:00:00.000Z", "Manual review");
     const resumed = resumeDeliveryRun(paused, "2026-01-03T02:00:00.000Z");
+    const cancelled = cancelDeliveryRun(run, "2026-01-03T02:30:00.000Z", "Operator cancelled");
     const lease = releaseWorkspaceLease(
       buildWorkspaceLease({
         leaseId: "lease-1",
@@ -176,6 +178,8 @@ describe("delivery services", () => {
     expect(paused.paused).toBe(true);
     expect(resumed.status).toBe("running");
     expect(resumed.pauseReason).toBeUndefined();
+    expect(cancelled.status).toBe("cancelled");
+    expect(cancelled.cancellationReason).toBe("Operator cancelled");
     expect(lease.isActive).toBe(false);
     expect(lock.isActive).toBe(false);
     expect(shouldReleaseRunResources("completed")).toBe(true);

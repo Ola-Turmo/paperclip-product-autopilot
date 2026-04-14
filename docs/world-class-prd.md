@@ -504,7 +504,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [~] Add stronger validation for approval mode, execution mode, and checklist completeness.
 - [~] Add convoy-task dependency validation and cycle detection.
 - [ ] Add clearer rules for when checkpoints are mandatory.
-- [ ] Add delivery-run cancellation semantics if cancellation is intended to be supported.
+- [~] Add delivery-run cancellation semantics if cancellation is intended to be supported.
 - [ ] Add run-time budget accounting hooks if Paperclip exposes the right telemetry.
 
 ### 16.8 Safety, rollback, and governance
@@ -540,7 +540,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [~] Add run-detail and health-check UX that exposes decision context, not just raw records.
 - [~] Add learning and knowledge-reuse visibility to operator surfaces.
 - [~] Add clearer intervention workflows for pause, resume, checkpoint, rollback, and note-taking.
-- [ ] Add budget and digest management surfaces.
+- [~] Add budget and digest management surfaces.
 - [~] Add better empty states, loading states, and error states.
 - [~] Add UI smoke tests.
 - [ ] Add run-detail and health-check UX that exposes decision context, not just raw records.

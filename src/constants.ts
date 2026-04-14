@@ -117,6 +117,7 @@ export const ACTION_KEYS = {
   // Delivery runs
   createDeliveryRun: "create-delivery-run",
   completeDeliveryRun: "complete-delivery-run",
+  cancelDeliveryRun: "cancel-delivery-run",
   pauseDeliveryRun: "pause-delivery-run",
   resumeDeliveryRun: "resume-delivery-run",
   getDeliveryRun: "get-delivery-run",

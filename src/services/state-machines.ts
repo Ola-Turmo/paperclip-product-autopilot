@@ -90,6 +90,7 @@ export function transitionRunStatus(input: {
   status: RunStatus;
   paused: boolean;
   pauseReason?: string;
+  cancellationReason?: string;
   completedAt: string | null;
   commitSha: string | null;
   prUrl?: string;
@@ -97,6 +98,7 @@ export function transitionRunStatus(input: {
 }, nextStatus: RunStatus, updatedAt: string, patch?: {
   paused?: boolean;
   pauseReason?: string;
+  cancellationReason?: string;
   commitSha?: string;
   prUrl?: string;
   error?: string;
@@ -104,6 +106,7 @@ export function transitionRunStatus(input: {
   status: RunStatus;
   paused: boolean;
   pauseReason?: string;
+  cancellationReason?: string;
   completedAt: string | null;
   commitSha: string | null;
   prUrl?: string;
@@ -116,6 +119,7 @@ export function transitionRunStatus(input: {
     status: nextStatus,
     paused: patch?.paused ?? input.paused,
     pauseReason: patch?.pauseReason,
+    cancellationReason: patch?.cancellationReason,
     commitSha: patch?.commitSha ?? input.commitSha,
     prUrl: patch?.prUrl,
     error: patch?.error,

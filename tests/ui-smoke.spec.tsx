@@ -54,6 +54,16 @@ describe("ui smoke", () => {
       budgetUsagePercent: 62,
     });
     dataState.set(makeKey(DATA_KEYS.researchCycles, { companyId: "company-1", projectId: "project-1" }), []);
+    dataState.set(makeKey(DATA_KEYS.companyBudget, { companyId: "company-1" }), {
+      budgetId: "budget-1",
+      companyId: "company-1",
+      totalBudgetMinutes: 500,
+      usedBudgetMinutes: 200,
+      autopilotBudgetMinutes: 120,
+      autopilotUsedMinutes: 75,
+      paused: false,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
     dataState.set(makeKey(DATA_KEYS.digests, { companyId: "company-1", projectId: "project-1" }), []);
     dataState.set(makeKey(DATA_KEYS.ideas, { companyId: "company-1", projectId: "project-1" }), []);
     dataState.set(makeKey(DATA_KEYS.deliveryRuns, { companyId: "company-1", projectId: "project-1" }), []);
@@ -67,6 +77,7 @@ describe("ui smoke", () => {
     );
 
     expect(html).toContain("Project Settings");
+    expect(html).toContain("Budget Controls");
     expect(html).toContain("Research and Ideation");
     expect(html).toContain("Digest Inbox");
     expect(html).toContain("Evaluation Scorecard");
@@ -89,6 +100,7 @@ describe("ui smoke", () => {
       leasedPort: 3000,
       commitSha: null,
       paused: false,
+      cancellationReason: undefined,
       completedAt: null,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -119,6 +131,7 @@ describe("ui smoke", () => {
     );
 
     expect(html).toContain("Run Summary");
+    expect(html).toContain("Cancel");
     expect(html).toContain("Release Health");
     expect(html).toContain("Operator Interventions");
     expect(html).toContain("Audit Timeline");

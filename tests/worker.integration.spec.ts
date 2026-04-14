@@ -237,6 +237,41 @@ describe("worker integration", () => {
     expect(releasedLocks[0]?.data.isActive).toBe(false);
   });
 
+  it("cancels a delivery run and releases workspace resources", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertIdea(harness.ctx, createIdea({ ideaId: "idea-cancel", status: "approved" }));
+
+    const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-cancel",
+      artifactId: "artifact-cancel",
+    });
+
+    const cancelled = await harness.performAction<{ status: string; cancellationReason: string }>(ACTION_KEYS.cancelDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      reason: "Operator stopped this run",
+    });
+
+    const leases = await harness.ctx.entities.list({
+      entityType: ENTITY_TYPES.workspaceLease,
+      scopeKind: "project",
+      scopeId: "project-1",
+    });
+    const locks = await harness.ctx.entities.list({
+      entityType: ENTITY_TYPES.productLock,
+      scopeKind: "project",
+      scopeId: "project-1",
+    });
+
+    expect(cancelled.status).toBe("cancelled");
+    expect(cancelled.cancellationReason).toBe("Operator stopped this run");
+    expect(leases.find((lease) => lease.data.runId === run.runId)?.data.isActive).toBe(false);
+    expect(locks.find((lock) => lock.data.runId === run.runId)?.data.isActive).toBe(false);
+  });
+
   it("resurfaces old maybe-pool ideas when the scheduled job runs", async () => {
     await upsertAutopilotProject(
       harness.ctx,

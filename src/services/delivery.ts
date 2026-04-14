@@ -167,6 +167,7 @@ export function updateDeliveryRunStatus(input: {
   commitSha?: string;
   prUrl?: string;
   error?: string;
+  cancellationReason?: string;
 }): DeliveryRun {
   return {
     ...input.run,
@@ -174,6 +175,7 @@ export function updateDeliveryRunStatus(input: {
       commitSha: input.commitSha,
       prUrl: input.prUrl,
       error: input.error,
+      cancellationReason: input.cancellationReason,
     }),
   };
 }
@@ -194,6 +196,17 @@ export function resumeDeliveryRun(run: DeliveryRun, updatedAt: string): Delivery
     ...transitionRunStatus(run, "running", updatedAt, {
       paused: false,
       pauseReason: undefined,
+    }),
+  };
+}
+
+export function cancelDeliveryRun(run: DeliveryRun, updatedAt: string, cancellationReason: string): DeliveryRun {
+  return {
+    ...run,
+    ...transitionRunStatus(run, "cancelled", updatedAt, {
+      paused: false,
+      pauseReason: undefined,
+      cancellationReason,
     }),
   };
 }

@@ -201,6 +201,7 @@ export const deliveryRunSchema = z.object({
   prNumber: z.number().optional(),
   paused: z.boolean(),
   pauseReason: z.string().optional(),
+  cancellationReason: z.string().optional(),
   completedAt: z.string().nullable(),
   error: z.string().optional(),
   createdAt: z.string().min(1),
@@ -217,6 +218,12 @@ export const deliveryRunSchema = z.object({
   }
   if (!["completed", "failed", "cancelled"].includes(run.status) && run.completedAt !== null) {
     ctx.addIssue({ code: "custom", message: "non-terminal runs cannot include completedAt", path: ["completedAt"] });
+  }
+  if (run.status === "cancelled" && !run.cancellationReason) {
+    ctx.addIssue({ code: "custom", message: "cancelled runs must include cancellationReason", path: ["cancellationReason"] });
+  }
+  if (run.status !== "cancelled" && run.cancellationReason) {
+    ctx.addIssue({ code: "custom", message: "only cancelled runs may include cancellationReason", path: ["cancellationReason"] });
   }
 });
 
