@@ -548,12 +548,12 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 ### 16.11 Testing and verification
 
 - [x] Add unit and integration coverage for the current baseline.
-- [ ] Add transition-matrix tests for state machines.
+- [x] Add transition-matrix tests for state machines.
 - [x] Add repository contract tests.
 - [ ] Add UI smoke tests.
 - [ ] Add more worker integration tests around rollback, checkpoint restore, release-health aggregation, and digest escalation.
 - [ ] Add fixture-driven tests for ranking and duplicate detection.
-- [ ] Add package-install validation in CI from a clean environment.
+- [x] Add package-install validation in CI from a clean environment.
 - [ ] Add failure-path tests, not just happy-path tests.
 
 ### 16.12 Documentation and operator trust

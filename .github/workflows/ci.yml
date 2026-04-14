@@ -29,3 +29,11 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Package Smoke Test
+        run: |
+          npm pack
+          mkdir -p /tmp/autopilot-package-smoke
+          cd /tmp/autopilot-package-smoke
+          npm init -y
+          npm install "${GITHUB_WORKSPACE}"/ola-turmo-paperclip-product-autopilot-0.1.0.tgz
