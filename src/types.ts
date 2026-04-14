@@ -66,6 +66,15 @@ export interface ResearchCycle {
   reportContent?: string;
   findingsCount: number;
   sources?: string[];
+  snapshot?: {
+    findingIds: string[];
+    topicCounts: Record<string, number>;
+    signalFamilyCounts: Record<string, number>;
+    averageFreshnessScore: number;
+    averageSourceQualityScore: number;
+    duplicateCount: number;
+    generatedAt: string;
+  };
   startedAt: string;
   completedAt?: string;
   error?: string;

@@ -10,6 +10,7 @@ import {
   buildRollbackAction,
   canTriggerRollback,
   checkpointSummary,
+  validateCheckpointRestore,
   updateReleaseHealthCheck,
 } from "../services/lifecycle.js";
 import { recordLifecycleSignals } from "../services/observability.js";
@@ -51,12 +52,14 @@ export function registerLifecycleActionHandlers(ctx: PluginContext) {
 
   ctx.actions.register(ACTION_KEYS.resumeFromCheckpoint, async (args) => {
     const a = args as { companyId: string; projectId: string; runId: string; checkpointId: string };
+    const run = await repo.getDeliveryRun(a.companyId, a.projectId, a.runId);
     const checkpoints = await repo.listCheckpoints(a.companyId, a.projectId, a.runId);
     const checkpoint = checkpoints.find((candidate) => candidate.checkpointId === a.checkpointId);
     if (!checkpoint) throw new Error("Checkpoint not found");
+    const tasks = await repo.listConvoyTasks(a.companyId, a.projectId, a.runId);
+    validateCheckpointRestore({ run, checkpoint, tasks });
 
     for (const [taskId, status] of Object.entries(checkpoint.taskStates)) {
-      const tasks = await repo.listConvoyTasks(a.companyId, a.projectId, a.runId);
       const task = tasks.find((candidate) => candidate.taskId === taskId);
       if (task) {
         await repo.upsertConvoyTask(buildRestoredConvoyTask(task, status as ConvoyTaskStatus, nowIso()));

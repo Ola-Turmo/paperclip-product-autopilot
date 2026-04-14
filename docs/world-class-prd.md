@@ -476,7 +476,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [~] Add freshness and confidence policies for findings.
 - [~] Add deduplication for research findings, not just ideas.
 - [~] Add support for grouping findings by signal family and topic.
-- [ ] Add reproducible research-cycle snapshots.
+- [~] Add reproducible research-cycle snapshots.
 - [~] Add deterministic tests for provenance, dedupe, and freshness behavior.
 
 ### 16.5 Idea generation and ranking
@@ -511,8 +511,8 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 
 - [x] Add checkpoint, release-health, and rollback primitives plus observability.
 - [ ] Strengthen rollback policy and rollback-action semantics.
-- [ ] Add stricter checkpoint restore validation.
-- [ ] Add release-health aggregation logic across multiple checks.
+- [~] Add stricter checkpoint restore validation.
+- [~] Add release-health aggregation logic across multiple checks.
 - [ ] Add digest escalation and suppression policy.
 - [ ] Add reopen rules, cooldown windows, and dedupe keys for digests.
 - [ ] Add explicit policy gates for destructive or risky actions.

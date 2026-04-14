@@ -114,6 +114,58 @@ export function checkpointSummary(checkpoint: Checkpoint): string {
   return checkpoint.label ?? `Checkpoint ${checkpoint.checkpointId.slice(0, 8)}`;
 }
 
+export function validateCheckpointRestore(input: {
+  run: DeliveryRun | null;
+  checkpoint: Checkpoint;
+  tasks: ConvoyTask[];
+}): void {
+  if (!input.run) {
+    throw new Error("Delivery run not found for checkpoint restore");
+  }
+  if (isTerminalRunStatus(input.run.status)) {
+    throw new Error(`Cannot restore checkpoint for terminal run status ${input.run.status}`);
+  }
+  if (input.checkpoint.workspaceSnapshot.branchName !== input.run.branchName) {
+    throw new Error("Checkpoint branch does not match current run branch");
+  }
+  const currentTaskIds = new Set(input.tasks.map((task) => task.taskId));
+  for (const taskId of Object.keys(input.checkpoint.taskStates)) {
+    if (!currentTaskIds.has(taskId)) {
+      throw new Error(`Checkpoint references missing convoy task ${taskId}`);
+    }
+  }
+}
+
+export function summarizeReleaseHealthChecks(checks: ReleaseHealthCheck[]): {
+  overallStatus: "healthy" | "degraded" | "blocked" | "idle";
+  total: number;
+  passed: number;
+  failed: number;
+  pending: number;
+  running: number;
+  skipped: number;
+} {
+  const summary = {
+    overallStatus: "idle" as "healthy" | "degraded" | "blocked" | "idle",
+    total: checks.length,
+    passed: 0,
+    failed: 0,
+    pending: 0,
+    running: 0,
+    skipped: 0,
+  };
+
+  for (const check of checks) {
+    summary[check.status] += 1;
+  }
+
+  if (summary.failed > 0) summary.overallStatus = "blocked";
+  else if (summary.running > 0 || summary.pending > 0) summary.overallStatus = "degraded";
+  else if (summary.total > 0) summary.overallStatus = "healthy";
+
+  return summary;
+}
+
 export function isTerminalRunStatus(status: string): status is Extract<RunStatus, "completed" | "failed" | "cancelled"> {
   return ["completed", "failed", "cancelled"].includes(status);
 }

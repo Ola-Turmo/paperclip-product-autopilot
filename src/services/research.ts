@@ -188,3 +188,35 @@ export function findDuplicateResearchFinding(
 
   return best;
 }
+
+export function buildResearchCycleSnapshot(findings: ResearchFinding[], generatedAt: string) {
+  const topicCounts: Record<string, number> = {};
+  const signalFamilyCounts: Record<string, number> = {};
+
+  let freshnessTotal = 0;
+  let sourceQualityTotal = 0;
+  let duplicateCount = 0;
+
+  for (const finding of findings) {
+    if (finding.topic) {
+      topicCounts[finding.topic] = (topicCounts[finding.topic] ?? 0) + 1;
+    }
+    if (finding.signalFamily) {
+      signalFamilyCounts[finding.signalFamily] = (signalFamilyCounts[finding.signalFamily] ?? 0) + 1;
+    }
+    freshnessTotal += finding.freshnessScore;
+    sourceQualityTotal += finding.sourceQualityScore;
+    if (finding.duplicateAnnotated) duplicateCount += 1;
+  }
+
+  const sampleCount = findings.length || 1;
+  return {
+    findingIds: findings.map((finding) => finding.findingId),
+    topicCounts,
+    signalFamilyCounts,
+    averageFreshnessScore: clampScore(freshnessTotal / sampleCount),
+    averageSourceQualityScore: clampScore(sourceQualityTotal / sampleCount),
+    duplicateCount,
+    generatedAt,
+  };
+}

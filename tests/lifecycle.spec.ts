@@ -6,6 +6,8 @@ import {
   buildRollbackAction,
   canTriggerRollback,
   checkpointSummary,
+  summarizeReleaseHealthChecks,
+  validateCheckpointRestore,
   updateReleaseHealthCheck,
 } from "../src/services/lifecycle.js";
 import type { ConvoyTask, DeliveryRun } from "../src/types.js";
@@ -68,6 +70,34 @@ describe("lifecycle services", () => {
     expect(restoredTask.status).toBe("blocked");
   });
 
+  it("validates checkpoint restores and rejects inconsistent state", () => {
+    const checkpoint = buildCheckpoint({
+      checkpointId: "checkpoint-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: "run-1",
+      run: createRun(),
+      tasks: [createTask()],
+      createdAt: "2026-01-02T00:00:00.000Z",
+    });
+
+    expect(() =>
+      validateCheckpointRestore({
+        run: { ...createRun(), status: "completed", completedAt: "2026-01-02T00:00:00.000Z" },
+        checkpoint,
+        tasks: [createTask()],
+      }),
+    ).toThrow("terminal run status");
+
+    expect(() =>
+      validateCheckpointRestore({
+        run: { ...createRun(), branchName: "other-branch" },
+        checkpoint,
+        tasks: [createTask()],
+      }),
+    ).toThrow("branch");
+  });
+
   it("builds and updates release health checks", () => {
     const check = buildReleaseHealthCheck({
       checkId: "check-1",
@@ -84,6 +114,38 @@ describe("lifecycle services", () => {
     expect(updated.status).toBe("failed");
     expect(updated.errorMessage).toBe("boom");
     expect(updated.failedAt).toBe("2026-01-03T00:00:00.000Z");
+  });
+
+  it("aggregates release health into an overall status", () => {
+    const summary = summarizeReleaseHealthChecks([
+      updateReleaseHealthCheck(
+        buildReleaseHealthCheck({
+          checkId: "check-1",
+          companyId: "company-1",
+          projectId: "project-1",
+          runId: "run-1",
+          checkType: "smoke_test",
+          name: "Smoke test",
+          createdAt: "2026-01-02T00:00:00.000Z",
+        }),
+        "failed",
+        "2026-01-03T00:00:00.000Z",
+        "boom",
+      ),
+      buildReleaseHealthCheck({
+        checkId: "check-2",
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-1",
+        checkType: "integration_test",
+        name: "Integration test",
+        createdAt: "2026-01-02T00:00:00.000Z",
+      }),
+    ]);
+
+    expect(summary.failed).toBe(1);
+    expect(summary.pending).toBe(1);
+    expect(summary.overallStatus).toBe("blocked");
   });
 
   it("builds rollback actions", () => {

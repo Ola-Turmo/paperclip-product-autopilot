@@ -523,4 +523,26 @@ describe("worker integration", () => {
     expect(second.duplicateAnnotated).toBe(true);
     expect(second.duplicateOfFindingId).toBe(first.findingId);
   });
+
+  it("captures a reproducible snapshot when a research cycle completes", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertResearchCycle(harness.ctx, createResearchCycle({ cycleId: "cycle-snapshot" }));
+    await upsertResearchFinding(harness.ctx, createFinding({
+      findingId: "finding-snapshot-1",
+      cycleId: "cycle-snapshot",
+      topic: "onboarding-completion",
+      signalFamily: "support",
+    }));
+
+    const completed = await harness.performAction<ResearchCycle>(ACTION_KEYS.completeResearchCycle, {
+      companyId: "company-1",
+      projectId: "project-1",
+      cycleId: "cycle-snapshot",
+      reportContent: "Snapshot complete",
+    });
+
+    expect(completed.status).toBe("completed");
+    expect(completed.snapshot?.findingIds).toContain("finding-snapshot-1");
+    expect(completed.snapshot?.signalFamilyCounts.support).toBe(1);
+  });
 });

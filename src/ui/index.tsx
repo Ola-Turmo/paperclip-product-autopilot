@@ -27,6 +27,7 @@ import type {
 import { buildRunAuditTimeline } from "../services/audit.js";
 import { getDigestPolicyBenchmarkSummary, getIdeationBenchmarkSummary, getQualityScorecardSummary } from "../services/evaluation-fixtures.js";
 import { classifyFailureMessage, formatFailureCategory } from "../services/failure-taxonomy.js";
+import { summarizeReleaseHealthChecks } from "../services/lifecycle.js";
 
 const PAGE: CSSProperties = { display: "grid", gap: 16, padding: 20 };
 const CARD: CSSProperties = {
@@ -297,6 +298,16 @@ function ResearchCard(props: { companyId: string; projectId: string; onRefresh: 
           <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
             <div style={{ fontWeight: 700, color: "#0f172a" }}>{latestCycle.query}</div>
             <div style={MUTED}>Findings: {latestCycle.findingsCount}</div>
+            {latestCycle.snapshot ? (
+              <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+                <div style={{ fontSize: 12, color: "#475569" }}>
+                  Avg freshness {latestCycle.snapshot.averageFreshnessScore} | Avg source quality {latestCycle.snapshot.averageSourceQualityScore}
+                </div>
+                <div style={{ fontSize: 12, color: "#475569" }}>
+                  Duplicate findings {latestCycle.snapshot.duplicateCount} | Topics {Object.keys(latestCycle.snapshot.topicCounts).slice(0, 3).join(", ") || "n/a"}
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </div>
@@ -770,6 +781,7 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
   });
+  const healthSummary = summarizeReleaseHealthChecks(checks ?? []);
 
   if (!run) {
     return <div style={PAGE}>Loading run details...</div>;
@@ -796,6 +808,15 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
           <div style={MUTED}>No release health checks yet.</div>
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
+            <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ fontWeight: 700, color: "#0f172a" }}>Overall Health</div>
+                <StatusPill status={healthSummary.overallStatus} />
+              </div>
+              <div style={{ ...MUTED, marginTop: 6 }}>
+                Passed {healthSummary.passed} | Failed {healthSummary.failed} | Pending {healthSummary.pending} | Running {healthSummary.running}
+              </div>
+            </div>
             {checks.map((check) => (
               <div key={check.checkId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>

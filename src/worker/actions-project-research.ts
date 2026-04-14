@@ -16,7 +16,7 @@ import {
   nowIso,
 } from "../helpers.js";
 import { createAutopilotRepository } from "../repositories/autopilot.js";
-import { createResearchFindingRecord } from "../services/research.js";
+import { buildResearchCycleSnapshot, createResearchFindingRecord } from "../services/research.js";
 import { processSwipeDecision } from "../services/orchestration.js";
 import {
   isNonEmptyString,
@@ -158,6 +158,7 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       status: "completed",
       reportContent: a.reportContent,
       findingsCount: findings.length,
+      snapshot: buildResearchCycleSnapshot(findings, nowIso()),
       completedAt: nowIso(),
     };
     await repo.upsertResearchCycle(updated);
