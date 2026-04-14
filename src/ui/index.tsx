@@ -744,12 +744,18 @@ export function AutopilotSettings({ context }: PluginSettingsPageProps) {
 }
 
 export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
-  const { data: run } = usePluginData<DeliveryRun>(DATA_KEYS.deliveryRun, {
+  const toast = usePluginToast();
+  const pauseRun = usePluginAction(ACTION_KEYS.pauseDeliveryRun);
+  const resumeRun = usePluginAction(ACTION_KEYS.resumeDeliveryRun);
+  const requestCheckpoint = usePluginAction(ACTION_KEYS.requestCheckpoint);
+  const addOperatorNote = usePluginAction(ACTION_KEYS.addOperatorNote);
+  const [operatorNote, setOperatorNote] = useState("");
+  const { data: run, refresh: refreshRun } = usePluginData<DeliveryRun>(DATA_KEYS.deliveryRun, {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
     runId: context.entityId,
   });
-  const { data: checkpoints } = usePluginData<Checkpoint[]>(DATA_KEYS.checkpoints, {
+  const { data: checkpoints, refresh: refreshCheckpoints } = usePluginData<Checkpoint[]>(DATA_KEYS.checkpoints, {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
     runId: context.entityId,
@@ -764,7 +770,7 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
     projectId: context.projectId ?? "",
     runId: context.entityId,
   });
-  const { data: interventions } = usePluginData<OperatorIntervention[]>(DATA_KEYS.operatorInterventions, {
+  const { data: interventions, refresh: refreshInterventions } = usePluginData<OperatorIntervention[]>(DATA_KEYS.operatorInterventions, {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
     runId: context.entityId,
@@ -786,21 +792,110 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
   if (!run) {
     return <div style={PAGE}>Loading run details...</div>;
   }
+  const activeRun = run;
+
+  async function refreshRunViews() {
+    refreshRun();
+    refreshCheckpoints();
+    refreshInterventions();
+  }
+
+  async function handlePauseResume() {
+    try {
+      if (activeRun.status === "paused") {
+        await resumeRun({
+          companyId: context.companyId,
+          projectId: context.projectId ?? "",
+          runId: activeRun.runId,
+        });
+        toast({ title: "Run resumed", tone: "success" });
+      } else {
+        await pauseRun({
+          companyId: context.companyId,
+          projectId: context.projectId ?? "",
+          runId: activeRun.runId,
+          reason: operatorNote || "Paused by operator",
+        });
+        toast({ title: "Run paused", tone: "success" });
+      }
+      await refreshRunViews();
+    } catch (error) {
+      toastError(toast, "Failed to update run state", error);
+    }
+  }
+
+  async function handleCheckpointRequest() {
+    try {
+      await requestCheckpoint({
+        companyId: context.companyId,
+        projectId: context.projectId ?? "",
+        runId: activeRun.runId,
+        reason: operatorNote || "Operator requested checkpoint",
+      });
+      toast({ title: "Checkpoint requested", tone: "success" });
+      await refreshRunViews();
+    } catch (error) {
+      toastError(toast, "Failed to request checkpoint", error);
+    }
+  }
+
+  async function handleOperatorNote() {
+    if (!operatorNote.trim()) return;
+    try {
+      await addOperatorNote({
+        companyId: context.companyId,
+        projectId: context.projectId ?? "",
+        runId: activeRun.runId,
+        note: operatorNote.trim(),
+      });
+      setOperatorNote("");
+      toast({ title: "Operator note added", tone: "success" });
+      await refreshRunViews();
+    } catch (error) {
+      toastError(toast, "Failed to add operator note", error);
+    }
+  }
 
   return (
     <div style={PAGE}>
-      <Section title="Run Summary" action={<StatusPill status={run.status} />}>
+      <Section
+        title="Run Summary"
+        action={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <StatusPill status={activeRun.status} />
+            <button onClick={handlePauseResume} style={BUTTON_SECONDARY}>
+              {activeRun.status === "paused" ? "Resume" : "Pause"}
+            </button>
+            <button onClick={handleCheckpointRequest} style={BUTTON_SECONDARY}>
+              Request Checkpoint
+            </button>
+          </div>
+        }
+      >
         <div style={{ display: "grid", gap: 8 }}>
-          <div style={{ fontWeight: 700, color: "#0f172a" }}>{run.title}</div>
-          <div style={MUTED}>Branch: {run.branchName}</div>
-          <div style={MUTED}>Workspace: {run.workspacePath}</div>
-          <div style={MUTED}>Port: {run.leasedPort ?? "n/a"}</div>
-          <div style={MUTED}>Commit: {run.commitSha ?? "n/a"}</div>
-          {classifyFailureMessage(run.error) ? (
-            <div style={MUTED}>Failure class: {formatFailureCategory(classifyFailureMessage(run.error))}</div>
+          <div style={{ fontWeight: 700, color: "#0f172a" }}>{activeRun.title}</div>
+          <div style={MUTED}>Branch: {activeRun.branchName}</div>
+          <div style={MUTED}>Workspace: {activeRun.workspacePath}</div>
+          <div style={MUTED}>Port: {activeRun.leasedPort ?? "n/a"}</div>
+          <div style={MUTED}>Commit: {activeRun.commitSha ?? "n/a"}</div>
+          {classifyFailureMessage(activeRun.error) ? (
+            <div style={MUTED}>Failure class: {formatFailureCategory(classifyFailureMessage(activeRun.error))}</div>
           ) : null}
-          {run.pauseReason ? <div style={MUTED}>Pause reason: {run.pauseReason}</div> : null}
-          {run.error ? <div style={{ color: "#dc2626", fontSize: 13 }}>{run.error}</div> : null}
+          {activeRun.pauseReason ? <div style={MUTED}>Pause reason: {activeRun.pauseReason}</div> : null}
+          {activeRun.error ? <div style={{ color: "#dc2626", fontSize: 13 }}>{activeRun.error}</div> : null}
+          <label style={{ display: "grid", gap: 6, marginTop: 8 }}>
+            <span style={LABEL}>Operator Note</span>
+            <textarea
+              value={operatorNote}
+              onChange={(event) => setOperatorNote((event.target as HTMLTextAreaElement).value)}
+              style={{ ...INPUT, minHeight: 80, resize: "vertical" }}
+            />
+          </label>
+          <div>
+            <button onClick={handleOperatorNote} style={BUTTON}>
+              Add Note
+            </button>
+          </div>
         </div>
       </Section>
       <Section title="Release Health">
@@ -853,11 +948,11 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
         )}
       </Section>
       <Section title="Learning and Reuse">
-        {!summaries || summaries.filter((summary) => summary.runId === run.runId).length === 0 ? (
+        {!summaries || summaries.filter((summary) => summary.runId === activeRun.runId).length === 0 ? (
           <div style={MUTED}>No learner summaries recorded for this run.</div>
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
-            {summaries.filter((summary) => summary.runId === run.runId).slice(0, 3).map((summary) => (
+            {summaries.filter((summary) => summary.runId === activeRun.runId).slice(0, 3).map((summary) => (
               <div key={summary.summaryId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
                 <div style={{ fontWeight: 700, color: "#0f172a" }}>{summary.title}</div>
                 <div style={{ ...MUTED, marginTop: 6 }}>{summary.summaryText}</div>
@@ -865,9 +960,9 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
             ))}
           </div>
         )}
-        {knowledge && knowledge.some((entry) => entry.sourceRunId === run.runId) ? (
+        {knowledge && knowledge.some((entry) => entry.sourceRunId === activeRun.runId) ? (
           <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-            {knowledge.filter((entry) => entry.sourceRunId === run.runId).slice(0, 3).map((entry) => (
+            {knowledge.filter((entry) => entry.sourceRunId === activeRun.runId).slice(0, 3).map((entry) => (
               <div key={entry.entryId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                   <div style={{ fontWeight: 700, color: "#0f172a" }}>{entry.title}</div>
@@ -880,12 +975,12 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
         ) : null}
       </Section>
       <AuditTimeline
-        run={run}
+        run={activeRun}
         checks={checks ?? []}
         interventions={interventions ?? []}
         checkpoints={checkpoints ?? []}
         rollbacks={rollbacks ?? []}
-        digests={(digests ?? []).filter((digest) => digest.relatedRunId === run.runId)}
+        digests={(digests ?? []).filter((digest) => digest.relatedRunId === activeRun.runId)}
       />
     </div>
   );

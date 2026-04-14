@@ -9,6 +9,7 @@ import type {
 } from "../types.js";
 import { newId, nowIso } from "../helpers.js";
 import { createAutopilotRepository } from "../repositories/autopilot.js";
+import { recordAutopilotEvent } from "../services/observability.js";
 import {
   createBudgetAlertDigest,
   createStuckRunDigest,
@@ -31,6 +32,11 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       createdAt: nowIso(),
     };
     await repo.upsertOperatorIntervention(intervention);
+    await recordAutopilotEvent(ctx, "operatorInterventionCreated", a.companyId, {
+      projectId: a.projectId,
+      runId: a.runId,
+      interventionType: intervention.interventionType,
+    });
     return intervention;
   });
 
@@ -46,6 +52,11 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       createdAt: nowIso(),
     };
     await repo.upsertOperatorIntervention(intervention);
+    await recordAutopilotEvent(ctx, "operatorInterventionCreated", a.companyId, {
+      projectId: a.projectId,
+      runId: a.runId,
+      interventionType: intervention.interventionType,
+    });
     return intervention;
   });
 
@@ -61,6 +72,11 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       createdAt: nowIso(),
     };
     await repo.upsertOperatorIntervention(intervention);
+    await recordAutopilotEvent(ctx, "operatorInterventionCreated", a.companyId, {
+      projectId: a.projectId,
+      runId: a.runId,
+      interventionType: intervention.interventionType,
+    });
     return intervention;
   });
 
@@ -165,6 +181,13 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
     const nextStatus = a.status ?? "dismissed";
     const updated = transitionDigest(digest, nextStatus, nowIso());
     await repo.upsertDigest(updated);
+    if (nextStatus === "dismissed") {
+      await recordAutopilotEvent(ctx, "digestDismissed", a.companyId, {
+        projectId: a.projectId,
+        digestId: a.digestId,
+        digestType: digest.digestType,
+      });
+    }
     return updated;
   });
 

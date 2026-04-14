@@ -447,6 +447,91 @@ describe("worker integration", () => {
     expect(dismissed.dismissedAt).toBeTruthy();
   });
 
+  it("emits research, delivery, intervention, and digest taxonomy events", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertIdea(harness.ctx, createIdea({ status: "approved" }));
+
+    const cycle = await harness.performAction<ResearchCycle>(ACTION_KEYS.startResearchCycle, {
+      companyId: "company-1",
+      projectId: "project-1",
+      query: "Research onboarding issues",
+    });
+    await harness.performAction(ACTION_KEYS.addResearchFinding, {
+      companyId: "company-1",
+      projectId: "project-1",
+      cycleId: cycle.cycleId,
+      title: "Improve onboarding completion",
+      description: "Users drop before activation",
+      sourceUrl: "https://example.com/support",
+      sourceLabel: "support-summary",
+      category: "user_feedback",
+      confidence: 0.91,
+      evidenceText: "Support tickets highlight onboarding confusion.",
+    });
+    await harness.performAction(ACTION_KEYS.completeResearchCycle, {
+      companyId: "company-1",
+      projectId: "project-1",
+      cycleId: cycle.cycleId,
+    });
+
+    const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-1",
+      artifactId: "artifact-1",
+    });
+    await harness.performAction(ACTION_KEYS.addOperatorNote, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      note: "Check rollout metrics",
+    });
+    await harness.performAction(ACTION_KEYS.completeDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      status: "completed",
+      commitSha: "abc1234",
+    });
+
+    await upsertCompanyBudget(harness.ctx, createBudget());
+    await upsertDeliveryRun(harness.ctx, createRun({ runId: "run-stuck" }));
+    await harness.runJob(JOB_KEYS.autopilotSweep);
+    const digests = await harness.ctx.entities.list({
+      entityType: ENTITY_TYPES.digest,
+      scopeKind: "project",
+      scopeId: "project-1",
+    });
+    await harness.performAction(ACTION_KEYS.dismissDigest, {
+      companyId: "company-1",
+      projectId: "project-1",
+      digestId: digests[0]?.data.digestId,
+    });
+
+    expect(harness.metrics.map((entry) => entry.name)).toEqual(
+      expect.arrayContaining([
+        "research_cycle.started",
+        "research_finding.added",
+        "research_cycle.completed",
+        "delivery_run.created",
+        "delivery_run.completed",
+        "operator_intervention.created",
+        "digest.dismissed",
+      ]),
+    );
+    expect(harness.telemetry.map((entry) => entry.eventName)).toEqual(
+      expect.arrayContaining([
+        "research_cycle_started",
+        "research_finding_added",
+        "research_cycle_completed",
+        "delivery_run_created",
+        "delivery_run_completed",
+        "operator_intervention_created",
+        "digest_dismissed",
+      ]),
+    );
+  });
+
   it("generates ideas deterministically from ranked research findings", async () => {
     await upsertAutopilotProject(harness.ctx, createProject());
     await upsertPreferenceProfile(harness.ctx, createPreferenceProfile());

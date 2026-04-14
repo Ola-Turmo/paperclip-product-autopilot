@@ -522,8 +522,8 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 ### 16.9 Observability and evaluation
 
 - [x] Add basic lifecycle telemetry and metrics.
-- [ ] Define a complete event taxonomy for all important transitions.
-- [ ] Emit metrics for research, idea ranking, planning, delivery, rollbacks, and operator interventions.
+- [~] Define a complete event taxonomy for all important transitions.
+- [~] Emit metrics for research, idea ranking, planning, delivery, rollbacks, and operator interventions.
 - [ ] Add duration and latency metrics, not just counters.
 - [~] Add structured failure categories.
 - [~] Build a replay harness for decision evaluation.
@@ -539,7 +539,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [~] Add budget and digest management surfaces.
 - [~] Add run-detail and health-check UX that exposes decision context, not just raw records.
 - [~] Add learning and knowledge-reuse visibility to operator surfaces.
-- [ ] Add clearer intervention workflows for pause, resume, checkpoint, rollback, and note-taking.
+- [~] Add clearer intervention workflows for pause, resume, checkpoint, rollback, and note-taking.
 - [ ] Add budget and digest management surfaces.
 - [ ] Add better empty states, loading states, and error states.
 - [ ] Add UI smoke tests.

@@ -32,6 +32,7 @@ import {
   shouldReleaseRunResources,
   updateDeliveryRunStatus,
 } from "../services/delivery.js";
+import { recordAutopilotEvent } from "../services/observability.js";
 import { shouldPauseForBudget } from "../services/policy.js";
 import { transitionConvoyTask } from "../services/state-machines.js";
 import {
@@ -147,6 +148,11 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       entityType: "delivery-run",
       entityId: runId,
     });
+    await recordAutopilotEvent(ctx, "deliveryRunCreated", a.companyId, {
+      projectId: a.projectId,
+      runId,
+      automationTier: run.automationTier,
+    });
     return run;
   });
 
@@ -183,6 +189,14 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       if (activeLock) {
         await repo.upsertProductLock(buildReleasedLock(activeLock, nowIso()));
       }
+    }
+
+    if (["completed", "failed", "cancelled"].includes(a.status)) {
+      await recordAutopilotEvent(ctx, "deliveryRunCompleted", a.companyId, {
+        projectId: a.projectId,
+        runId: a.runId,
+        status: a.status,
+      });
     }
 
     return updated;

@@ -16,6 +16,7 @@ import {
   nowIso,
 } from "../helpers.js";
 import { createAutopilotRepository } from "../repositories/autopilot.js";
+import { recordAutopilotEvent } from "../services/observability.js";
 import { buildResearchCycleSnapshot, createResearchFindingRecord } from "../services/research.js";
 import { processSwipeDecision } from "../services/orchestration.js";
 import {
@@ -143,6 +144,10 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       entityType: "research-cycle",
       entityId: cycle.cycleId,
     });
+    await recordAutopilotEvent(ctx, "researchCycleStarted", a.companyId, {
+      projectId: a.projectId,
+      cycleId: cycle.cycleId,
+    });
     return cycle;
   });
 
@@ -162,6 +167,11 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       completedAt: nowIso(),
     };
     await repo.upsertResearchCycle(updated);
+    await recordAutopilotEvent(ctx, "researchCycleCompleted", a.companyId, {
+      projectId: a.projectId,
+      cycleId: a.cycleId,
+      findingCount: String(findings.length),
+    });
     return updated;
   });
 
@@ -210,6 +220,12 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
         }
       : finding;
     await repo.upsertResearchFinding(persistedFinding);
+    await recordAutopilotEvent(ctx, "researchFindingAdded", a.companyId, {
+      projectId: a.projectId,
+      cycleId: a.cycleId,
+      signalFamily: persistedFinding.signalFamily ?? "unknown",
+      duplicateAnnotated: String(persistedFinding.duplicateAnnotated),
+    });
     return {
       ...persistedFinding,
       duplicateSimilarity: duplicate?.similarity,
@@ -260,6 +276,11 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       message: `Idea created: ${a.title.slice(0, 60)}`,
       entityType: "idea",
       entityId: idea.ideaId,
+    });
+    await recordAutopilotEvent(ctx, "ideaCreated", a.companyId, {
+      projectId: a.projectId,
+      ideaId: idea.ideaId,
+      duplicateAnnotated: String(idea.duplicateAnnotated),
     });
     return { ...idea, duplicateSimilarity: duplicate?.similarity };
   });
