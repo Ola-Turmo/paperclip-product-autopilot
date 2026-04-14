@@ -38,6 +38,11 @@ function createProfile(): PreferenceProfile {
       technical: { pass: 2, maybe: 0, yes: 0, now: 0 },
     },
     tagPreferences: {},
+    complexityPreferences: {
+      low: { pass: 0, maybe: 0, yes: 1, now: 1 },
+      medium: { pass: 0, maybe: 1, yes: 2, now: 1 },
+      high: { pass: 1, maybe: 0, yes: 0, now: 0 },
+    },
     avgApprovedScore: 74,
     avgRejectedScore: 40,
     lastUpdated: "2026-01-01T00:00:00.000Z",

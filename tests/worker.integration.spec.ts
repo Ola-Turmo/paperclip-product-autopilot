@@ -73,6 +73,10 @@ function createPreferenceProfile(overrides: Partial<PreferenceProfile> = {}): Pr
       user_feedback: { pass: 0, maybe: 1, yes: 2, now: 2 },
     },
     tagPreferences: {},
+    complexityPreferences: {
+      low: { pass: 0, maybe: 0, yes: 1, now: 1 },
+      medium: { pass: 0, maybe: 1, yes: 1, now: 1 },
+    },
     avgApprovedScore: 78,
     avgRejectedScore: 32,
     lastUpdated: "2026-01-01T00:00:00.000Z",

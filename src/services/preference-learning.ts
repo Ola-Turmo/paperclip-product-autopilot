@@ -1,6 +1,7 @@
 import type {
   DeliveryRun,
   Idea,
+  PlanningArtifact,
   ReleaseHealthCheck,
   RollbackAction,
 } from "../types.js";
@@ -18,6 +19,7 @@ export interface OutcomePreferenceSignals {
   categorySignals: Record<string, OutcomePreferenceBucket>;
   tagSignals: Record<string, OutcomePreferenceBucket>;
   complexitySignals: Record<string, OutcomePreferenceBucket>;
+  executionModeSignals: Record<string, OutcomePreferenceBucket>;
 }
 
 function createBucket(): OutcomePreferenceBucket {
@@ -107,13 +109,16 @@ export function scoreDeliveryOutcome(input: {
 export function buildOutcomePreferenceSignals(input: {
   ideas: Idea[];
   runs: DeliveryRun[];
+  planningArtifacts?: PlanningArtifact[];
   healthChecks: ReleaseHealthCheck[];
   rollbacks: RollbackAction[];
 }): OutcomePreferenceSignals {
   const ideaById = new Map(input.ideas.map((idea) => [idea.ideaId, idea]));
+  const artifactById = new Map((input.planningArtifacts ?? []).map((artifact) => [artifact.artifactId, artifact]));
   const categorySignals: Record<string, OutcomePreferenceBucket> = {};
   const tagSignals: Record<string, OutcomePreferenceBucket> = {};
   const complexitySignals: Record<string, OutcomePreferenceBucket> = {};
+  const executionModeSignals: Record<string, OutcomePreferenceBucket> = {};
 
   let totalScore = 0;
   let totalSamples = 0;
@@ -132,6 +137,7 @@ export function buildOutcomePreferenceSignals(input: {
 
     appendBucketSample(categorySignals, idea.category, score);
     appendBucketSample(complexitySignals, idea.complexityEstimate, score);
+    appendBucketSample(executionModeSignals, artifactById.get(run.artifactId)?.executionMode, score);
     for (const tag of idea.tags ?? []) {
       appendBucketSample(tagSignals, tag, score);
     }
@@ -143,6 +149,7 @@ export function buildOutcomePreferenceSignals(input: {
     categorySignals,
     tagSignals,
     complexitySignals,
+    executionModeSignals,
   };
 }
 
@@ -151,6 +158,7 @@ export function computeOutcomeBoost(input: {
   category?: string;
   tags?: string[];
   complexityEstimate?: Idea["complexityEstimate"];
+  executionMode?: "simple" | "convoy";
 }): { boost: number; evidenceCount: number } {
   const signals = input.signals;
   if (!signals || signals.totalSamples === 0) {
@@ -163,6 +171,9 @@ export function computeOutcomeBoost(input: {
   }
   if (input.complexityEstimate && signals.complexitySignals[input.complexityEstimate]) {
     contributors.push(signals.complexitySignals[input.complexityEstimate]);
+  }
+  if (input.executionMode && signals.executionModeSignals[input.executionMode]) {
+    contributors.push(signals.executionModeSignals[input.executionMode]);
   }
   for (const tag of input.tags ?? []) {
     const bucket = signals.tagSignals[tag];

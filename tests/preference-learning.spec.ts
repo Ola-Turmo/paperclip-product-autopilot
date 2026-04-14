@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   DeliveryRun,
   Idea,
+  PlanningArtifact,
   ReleaseHealthCheck,
   RollbackAction,
 } from "../src/types.js";
@@ -86,6 +87,29 @@ function createRollback(overrides: Partial<RollbackAction> = {}): RollbackAction
   };
 }
 
+function createArtifact(overrides: Partial<PlanningArtifact> = {}): PlanningArtifact {
+  return {
+    artifactId: "artifact-1",
+    companyId: "company-1",
+    projectId: "project-1",
+    ideaId: "idea-1",
+    title: "Plan onboarding improvements",
+    goalAlignmentSummary: "Improve activation",
+    implementationSpec: "Update onboarding flow",
+    dependencies: [],
+    rolloutPlan: "Ship behind a flag",
+    testPlan: "Run smoke tests",
+    approvalChecklist: ["Review plan"],
+    executionMode: "simple",
+    approvalMode: "manual",
+    automationTier: "semiauto",
+    status: "approved",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 describe("preference learning", () => {
   it("scores successful runs above failed runs with rollbacks", () => {
     const successful = scoreDeliveryOutcome({
@@ -125,9 +149,18 @@ describe("preference learning", () => {
         createRun({
           runId: "run-2",
           ideaId: "idea-2",
+          artifactId: "artifact-2",
           status: "failed",
           completedAt: "2026-01-05T00:00:00.000Z",
           updatedAt: "2026-01-05T00:00:00.000Z",
+        }),
+      ],
+      planningArtifacts: [
+        createArtifact(),
+        createArtifact({
+          artifactId: "artifact-2",
+          ideaId: "idea-2",
+          executionMode: "convoy",
         }),
       ],
       healthChecks: [
@@ -147,6 +180,8 @@ describe("preference learning", () => {
     expect(signals.categorySignals.user_feedback.averageScore).toBeGreaterThan(0);
     expect(signals.categorySignals.technical.averageScore).toBeLessThan(0);
     expect(signals.tagSignals.activation.sampleCount).toBe(1);
+    expect(signals.executionModeSignals.simple.averageScore).toBeGreaterThan(0);
+    expect(signals.executionModeSignals.convoy.averageScore).toBeLessThan(0);
     expect(signals.totalSamples).toBe(2);
   });
 
@@ -154,6 +189,7 @@ describe("preference learning", () => {
     const signals = buildOutcomePreferenceSignals({
       ideas: [createIdea()],
       runs: [createRun()],
+      planningArtifacts: [createArtifact()],
       healthChecks: [createCheck()],
       rollbacks: [],
     });
@@ -163,6 +199,7 @@ describe("preference learning", () => {
       category: "user_feedback",
       tags: ["activation"],
       complexityEstimate: "medium",
+      executionMode: "simple",
     });
 
     expect(boost.boost).toBeGreaterThan(0);

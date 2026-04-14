@@ -159,6 +159,7 @@ export const preferenceProfileSchema = z.object({
   totalSwipes: z.number().int().nonnegative(),
   categoryPreferences: z.record(swipeBreakdownSchema),
   tagPreferences: z.record(swipeBreakdownSchema),
+  complexityPreferences: z.record(swipeBreakdownSchema),
   avgApprovedScore: z.number(),
   avgRejectedScore: z.number(),
   lastUpdated: z.string().min(1),

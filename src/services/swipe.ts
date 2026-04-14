@@ -46,6 +46,7 @@ export function createEmptyPreferenceProfile(input: {
     totalSwipes: 0,
     categoryPreferences: {},
     tagPreferences: {},
+    complexityPreferences: {},
     avgApprovedScore: 0,
     avgRejectedScore: 0,
     lastUpdated: input.lastUpdated,

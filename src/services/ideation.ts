@@ -60,6 +60,20 @@ function computePreferenceBoost(
   return ((positive - negative) / total) * 10;
 }
 
+function computeComplexityPreferenceBoost(
+  profile: PreferenceProfile | null | undefined,
+  complexityEstimate?: Idea["complexityEstimate"],
+): number {
+  if (!profile || !complexityEstimate) return 0;
+  const stats = profile.complexityPreferences?.[complexityEstimate];
+  if (!stats) return 0;
+  const positive = stats.yes + stats.now;
+  const negative = stats.pass;
+  const total = positive + negative + stats.maybe;
+  if (total === 0) return 0;
+  return ((positive - negative) / total) * 6;
+}
+
 function computeResearchQualityBoost(finding: ResearchFinding): number {
   const freshnessBoost = ((finding.freshnessScore ?? 50) - 50) / 8;
   const sourceQualityBoost = ((finding.sourceQualityScore ?? 50) - 50) / 10;
@@ -86,16 +100,24 @@ export function scoreFindingForIdea(
   const confidenceBoost = (finding.confidence - 0.5) * 24;
   const preferenceBoost = computePreferenceBoost(profile, finding.category);
   const researchQualityBoost = computeResearchQualityBoost(finding);
+  const provisionalComplexity =
+    categoryBaseFeasibility(finding.category) + confidenceBoost / 2 >= 68 ? "low" :
+    categoryBaseFeasibility(finding.category) + confidenceBoost / 2 >= 56 ? "medium" : "high";
+  const executionMode = provisionalComplexity === "high" ? "convoy" : "simple";
+  const complexityPreferenceBoost = computeComplexityPreferenceBoost(profile, provisionalComplexity);
   const outcomeBoost = computeOutcomeBoost({
     signals: outcomeSignals,
     category: finding.category,
     tags: finding.category ? [finding.category] : [],
+    complexityEstimate: provisionalComplexity,
+    executionMode,
   });
 
   const impactScore = clampScore(
     categoryBaseImpact(finding.category) +
       confidenceBoost +
       preferenceBoost +
+      complexityPreferenceBoost +
       researchQualityBoost +
       outcomeBoost.boost,
   );
@@ -103,6 +125,7 @@ export function scoreFindingForIdea(
     categoryBaseFeasibility(finding.category) +
       confidenceBoost / 2 +
       preferenceBoost / 2 +
+      complexityPreferenceBoost / 2 +
       researchQualityBoost / 2 +
       outcomeBoost.boost / 2,
   );
@@ -113,6 +136,9 @@ export function scoreFindingForIdea(
     `freshness=${finding.freshnessScore}`,
     `sourceQuality=${finding.sourceQualityScore}`,
     `preferenceBoost=${preferenceBoost.toFixed(1)}`,
+    `complexity=${provisionalComplexity}`,
+    `complexityPreferenceBoost=${complexityPreferenceBoost.toFixed(1)}`,
+    `executionMode=${executionMode}`,
     `researchQualityBoost=${researchQualityBoost.toFixed(1)}`,
     `outcomeBoost=${outcomeBoost.boost.toFixed(1)}`,
     `outcomeEvidence=${outcomeBoost.evidenceCount}`,

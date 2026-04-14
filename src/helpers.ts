@@ -1128,6 +1128,13 @@ export function applySwipeToPreferenceProfile(
     }
   }
 
+  if (idea.complexityEstimate) {
+    if (!updated.complexityPreferences[idea.complexityEstimate]) {
+      updated.complexityPreferences[idea.complexityEstimate] = { pass: 0, maybe: 0, yes: 0, now: 0 };
+    }
+    updated.complexityPreferences[idea.complexityEstimate][decision] += 1;
+  }
+
   updated.lastUpdated = nowIso();
   return updated;
 }

@@ -156,6 +156,7 @@ export interface PreferenceProfile {
   totalSwipes: number;
   categoryPreferences: Record<string, { pass: number; maybe: number; yes: number; now: number }>;
   tagPreferences: Record<string, { pass: number; maybe: number; yes: number; now: number }>;
+  complexityPreferences: Record<string, { pass: number; maybe: number; yes: number; now: number }>;
   avgApprovedScore: number;
   avgRejectedScore: number;
   lastUpdated: string;

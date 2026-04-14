@@ -21,6 +21,7 @@ import type {
   KnowledgeEntry,
   LearnerSummary,
   OperatorIntervention,
+  PreferenceProfile,
   ReleaseHealthCheck,
   RollbackAction,
   ResearchCycle,
@@ -154,6 +155,67 @@ function LoadingState(props: { label: string }) {
       <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>Loading {props.label}</div>
       <div style={MUTED}>Fetching the latest operator state.</div>
     </div>
+  );
+}
+
+function extractRationaleSignal(rationale: string | undefined, key: string): string | null {
+  if (!rationale) return null;
+  const match = rationale.match(new RegExp(`${key}=([^,]+)`));
+  return match?.[1]?.trim() ?? null;
+}
+
+function PreferenceSignalsCard(props: { companyId: string; projectId: string }) {
+  const { data: profile } = usePluginData<PreferenceProfile | null>(DATA_KEYS.preferenceProfile, {
+    companyId: props.companyId,
+    projectId: props.projectId,
+  });
+  const preferenceProfile = profile;
+
+  const topCategory = Object.entries(preferenceProfile?.categoryPreferences ?? {})
+    .sort(([, left], [, right]) => (right.yes + right.now - right.pass) - (left.yes + left.now - left.pass))[0];
+  const topComplexity = Object.entries(preferenceProfile?.complexityPreferences ?? {})
+    .sort(([, left], [, right]) => (right.yes + right.now - right.pass) - (left.yes + left.now - left.pass))[0];
+
+  return (
+    <Section title="Preference Signals">
+      {!preferenceProfile || !preferenceProfile.totalSwipes ? (
+        <EmptyState
+          title="No learned preference signal yet"
+          body="Once operators swipe ideas and runs complete, the system will summarize the strongest learned preferences here."
+        />
+      ) : (
+        <div style={{ display: "grid", gap: 12 }}>
+          <div style={GRID}>
+            <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{preferenceProfile.totalSwipes}</div>
+              <div style={MUTED}>Total Swipes</div>
+            </div>
+            <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
+                {Math.round(preferenceProfile.avgApprovedScore ?? 0)}
+              </div>
+              <div style={MUTED}>Avg Approved Score</div>
+            </div>
+            <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
+                {Math.round(preferenceProfile.avgRejectedScore ?? 0)}
+              </div>
+              <div style={MUTED}>Avg Rejected Score</div>
+            </div>
+          </div>
+          <div style={{ display: "grid", gap: 10 }}>
+            <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+              <div style={{ fontWeight: 700, color: "#0f172a" }}>Top Category Preference</div>
+              <div style={MUTED}>{topCategory ? topCategory[0] : "No clear category preference yet"}</div>
+            </div>
+            <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+              <div style={{ fontWeight: 700, color: "#0f172a" }}>Top Complexity Preference</div>
+              <div style={MUTED}>{topComplexity ? topComplexity[0] : "No clear complexity preference yet"}</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </Section>
   );
 }
 
@@ -368,6 +430,11 @@ function IdeasCard(props: { companyId: string; projectId: string }) {
               {idea.rationale ? (
                 <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
                   Why: {idea.rationale}
+                </div>
+              ) : null}
+              {extractRationaleSignal(idea.rationale, "preferenceBoost") ? (
+                <div style={{ fontSize: 12, color: "#0f766e", marginTop: 6 }}>
+                  Preference boost {extractRationaleSignal(idea.rationale, "preferenceBoost")} | Complexity boost {extractRationaleSignal(idea.rationale, "complexityPreferenceBoost") ?? "0.0"} | Outcome boost {extractRationaleSignal(idea.rationale, "outcomeBoost") ?? "0.0"}
                 </div>
               ) : null}
               {idea.duplicateAnnotated ? (
@@ -780,6 +847,7 @@ export function AutopilotProjectTab({ context }: PluginDetailTabProps) {
       <BudgetControlCard companyId={companyId} onSaved={refreshAll} />
       <ResearchCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
       <EvaluationCard />
+      <PreferenceSignalsCard companyId={companyId} projectId={projectId} />
       <LearningCard companyId={companyId} projectId={projectId} />
       <DigestsCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
       <IdeasCard companyId={companyId} projectId={projectId} />

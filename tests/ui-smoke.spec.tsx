@@ -64,6 +64,29 @@ describe("ui smoke", () => {
       paused: false,
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
+    dataState.set(makeKey(DATA_KEYS.preferenceProfile, { companyId: "company-1", projectId: "project-1" }), {
+      profileId: "profile-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      passCount: 1,
+      maybeCount: 1,
+      yesCount: 2,
+      nowCount: 1,
+      totalSwipes: 5,
+      categoryPreferences: {
+        user_feedback: { pass: 0, maybe: 1, yes: 2, now: 1 },
+      },
+      tagPreferences: {
+        activation: { pass: 0, maybe: 0, yes: 2, now: 1 },
+      },
+      complexityPreferences: {
+        low: { pass: 0, maybe: 0, yes: 1, now: 1 },
+        medium: { pass: 1, maybe: 1, yes: 1, now: 0 },
+      },
+      avgApprovedScore: 78,
+      avgRejectedScore: 30,
+      lastUpdated: "2026-01-01T00:00:00.000Z",
+    });
     dataState.set(makeKey(DATA_KEYS.digests, { companyId: "company-1", projectId: "project-1" }), []);
     dataState.set(makeKey(DATA_KEYS.ideas, { companyId: "company-1", projectId: "project-1" }), []);
     dataState.set(makeKey(DATA_KEYS.deliveryRuns, { companyId: "company-1", projectId: "project-1" }), []);
@@ -81,6 +104,7 @@ describe("ui smoke", () => {
     expect(html).toContain("Research and Ideation");
     expect(html).toContain("Digest Inbox");
     expect(html).toContain("Evaluation Scorecard");
+    expect(html).toContain("Preference Signals");
   });
 
   it("renders the run detail tab health and audit views", () => {

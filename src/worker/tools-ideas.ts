@@ -124,17 +124,19 @@ export function registerIdeaToolHandlers(ctx: PluginContext) {
   }, async (params, _runCtx): Promise<ToolResult> => {
     const a = params as { companyId: string; projectId: string; count?: number };
     const count = parsePositiveInt(a.count, 5);
-    const [findings, profile, historicalIdeas, runs, checks, rollbacks] = await Promise.all([
+    const [findings, profile, historicalIdeas, runs, checks, rollbacks, planningArtifacts] = await Promise.all([
       repo.listResearchFindings(a.companyId, a.projectId),
       repo.getPreferenceProfile(a.companyId, a.projectId),
       repo.listIdeas(a.companyId, a.projectId),
       repo.listDeliveryRuns(a.companyId, a.projectId),
       repo.listReleaseHealthChecks(a.companyId, a.projectId),
       repo.listRollbackActions(a.companyId, a.projectId),
+      repo.listPlanningArtifacts(a.companyId, a.projectId),
     ]);
     const outcomeSignals = buildOutcomePreferenceSignals({
       ideas: historicalIdeas,
       runs,
+      planningArtifacts,
       healthChecks: checks,
       rollbacks,
     });
