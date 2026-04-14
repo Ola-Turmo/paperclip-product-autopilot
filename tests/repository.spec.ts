@@ -197,6 +197,7 @@ function createPlanningArtifact(overrides: Partial<PlanningArtifact> = {}): Plan
     approvalChecklist: ["Review UX copy"],
     executionMode: "simple",
     approvalMode: "manual",
+    checkpointRequired: false,
     automationTier: "supervised",
     status: "draft",
     createdAt: "2026-01-01T00:00:00.000Z",

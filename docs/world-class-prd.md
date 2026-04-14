@@ -503,7 +503,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [~] Make planning artifacts more structured and less free-form.
 - [~] Add stronger validation for approval mode, execution mode, and checklist completeness.
 - [~] Add convoy-task dependency validation and cycle detection.
-- [ ] Add clearer rules for when checkpoints are mandatory.
+- [~] Add clearer rules for when checkpoints are mandatory.
 - [~] Add delivery-run cancellation semantics if cancellation is intended to be supported.
 - [ ] Add run-time budget accounting hooks if Paperclip exposes the right telemetry.
 

@@ -116,6 +116,15 @@ describe("invariant services", () => {
       ),
     ).toThrow("at least two checklist items");
 
+    expect(() =>
+      validatePlanningArtifactInvariant(
+        createPlanningArtifact({
+          checkpointRequired: true,
+          checkpointReason: undefined,
+        }),
+      ),
+    ).toThrow("checkpointReason");
+
     const activeLock: ProductLock = {
       lockId: "lock-1",
       companyId: "company-1",

@@ -6,10 +6,12 @@ import {
   buildRollbackAction,
   canTriggerRollback,
   checkpointSummary,
+  describeCheckpointPolicy,
   summarizeReleaseHealthChecks,
   validateCheckpointRestore,
   updateReleaseHealthCheck,
 } from "../src/services/lifecycle.js";
+import { requiresCheckpointForRunGate } from "../src/services/delivery.js";
 import type { ConvoyTask, DeliveryRun } from "../src/types.js";
 
 function createRun(): DeliveryRun {
@@ -206,5 +208,37 @@ describe("lifecycle services", () => {
         createdAt: "2026-01-03T00:00:00.000Z",
       }),
     ).toThrow("checkpointId is required");
+  });
+
+  it("describes whether checkpoint policy is required and satisfied", () => {
+    const artifact = {
+      artifactId: "artifact-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-1",
+      title: "Plan",
+      goalAlignmentSummary: "Goal",
+      implementationSpec: "Spec",
+      dependencies: [],
+      rolloutPlan: "Rollout",
+      testPlan: "Tests",
+      approvalChecklist: ["Review"],
+      executionMode: "convoy" as const,
+      approvalMode: "manual" as const,
+      checkpointRequired: true,
+      checkpointReason: "Convoy execution requires a checkpoint before risky multi-step delivery.",
+      automationTier: "semiauto" as const,
+      status: "approved" as const,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+
+    const gateWithoutCheckpoint = requiresCheckpointForRunGate({ artifact, checkpoints: [] });
+    const gateWithCheckpoint = requiresCheckpointForRunGate({ artifact, checkpoints: [{ checkpointId: "checkpoint-1" }] });
+
+    expect(gateWithoutCheckpoint.required).toBe(true);
+    expect(gateWithoutCheckpoint.satisfied).toBe(false);
+    expect(gateWithCheckpoint.satisfied).toBe(true);
+    expect(describeCheckpointPolicy(artifact)).toContain("checkpoint");
   });
 });

@@ -10,6 +10,23 @@ import type {
 import type { RunStatus } from "../constants.js";
 import { transitionRunStatus } from "./state-machines.js";
 
+export function deriveCheckpointRequirement(input: {
+  automationTier: AutomationTier;
+  executionMode: "simple" | "convoy";
+  complexityEstimate?: Idea["complexityEstimate"];
+}): { required: boolean; reason?: string } {
+  if (input.executionMode === "convoy") {
+    return { required: true, reason: "Convoy execution requires a checkpoint before risky multi-step delivery." };
+  }
+  if (input.complexityEstimate === "high") {
+    return { required: true, reason: "High-complexity work requires a checkpoint before execution." };
+  }
+  if (input.automationTier === "fullauto") {
+    return { required: true, reason: "Fullauto runs require a checkpoint for operator-safe recovery." };
+  }
+  return { required: false, reason: undefined };
+}
+
 export function buildPlanningArtifact(input: {
   artifactId: string;
   companyId: string;
@@ -28,6 +45,12 @@ export function buildPlanningArtifact(input: {
   executionMode?: "simple" | "convoy";
   approvalMode?: "manual" | "auto_approve";
 }): PlanningArtifact {
+  const executionMode = input.executionMode ?? ((input.dependencies?.length ?? 0) > 0 ? "convoy" : "simple");
+  const checkpointPolicy = deriveCheckpointRequirement({
+    automationTier: input.automationTier,
+    executionMode,
+    complexityEstimate: input.idea.complexityEstimate,
+  });
   return {
     artifactId: input.artifactId,
     companyId: input.companyId,
@@ -50,8 +73,10 @@ export function buildPlanningArtifact(input: {
         "Confirm implementation scope matches the idea rationale",
         "Confirm rollback and release-health checks are defined",
       ],
-    executionMode: input.executionMode ?? ((input.dependencies?.length ?? 0) > 0 ? "convoy" : "simple"),
+    executionMode,
     approvalMode: input.approvalMode ?? (input.automationTier === "fullauto" ? "auto_approve" : "manual"),
+    checkpointRequired: checkpointPolicy.required,
+    checkpointReason: checkpointPolicy.reason,
     automationTier: input.automationTier,
     status: "draft",
     createdAt: input.createdAt,
@@ -208,6 +233,19 @@ export function cancelDeliveryRun(run: DeliveryRun, updatedAt: string, cancellat
       pauseReason: undefined,
       cancellationReason,
     }),
+  };
+}
+
+export function requiresCheckpointForRunGate(input: {
+  artifact?: PlanningArtifact | null;
+  checkpoints?: { checkpointId: string }[];
+}): { required: boolean; satisfied: boolean; reason?: string } {
+  const required = input.artifact?.checkpointRequired ?? false;
+  const satisfied = !required || (input.checkpoints?.length ?? 0) > 0;
+  return {
+    required,
+    satisfied,
+    reason: input.artifact?.checkpointReason,
   };
 }
 

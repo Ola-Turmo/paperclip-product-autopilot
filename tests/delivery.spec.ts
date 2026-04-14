@@ -67,6 +67,33 @@ describe("delivery services", () => {
     expect(artifact.title).toContain("Plan:");
     expect(artifact.approvalMode).toBe("manual");
     expect(artifact.implementationSpec).toBe("Ship better UX copy");
+    expect(artifact.checkpointRequired).toBe(false);
+  });
+
+  it("marks checkpoints required for convoy or fullauto plans", () => {
+    const convoyArtifact = buildPlanningArtifact({
+      artifactId: "artifact-convoy",
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-1",
+      idea: createIdea(),
+      automationTier: "semiauto",
+      createdAt: "2026-01-02T00:00:00.000Z",
+      executionMode: "convoy",
+    });
+    const fullautoArtifact = buildPlanningArtifact({
+      artifactId: "artifact-fullauto",
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-1",
+      idea: createIdea(),
+      automationTier: "fullauto",
+      createdAt: "2026-01-02T00:00:00.000Z",
+    });
+
+    expect(convoyArtifact.checkpointRequired).toBe(true);
+    expect(convoyArtifact.checkpointReason).toContain("Convoy");
+    expect(fullautoArtifact.checkpointRequired).toBe(true);
   });
 
   it("decides correctly when delivery should start from a swipe", () => {

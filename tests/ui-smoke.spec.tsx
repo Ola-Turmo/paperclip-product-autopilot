@@ -129,6 +129,27 @@ describe("ui smoke", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
+    dataState.set(makeKey(DATA_KEYS.planningArtifact, { companyId: "company-1", projectId: "project-1", artifactId: "artifact-1" }), {
+      artifactId: "artifact-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-1",
+      title: "Plan onboarding improvements",
+      goalAlignmentSummary: "Improve activation",
+      implementationSpec: "Update onboarding flow",
+      dependencies: [],
+      rolloutPlan: "Ship behind a flag",
+      testPlan: "Run smoke tests",
+      approvalChecklist: ["Review plan"],
+      executionMode: "convoy",
+      approvalMode: "manual",
+      checkpointRequired: true,
+      checkpointReason: "Convoy execution requires a checkpoint before risky multi-step delivery.",
+      automationTier: "semiauto",
+      status: "approved",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
     dataState.set(makeKey(DATA_KEYS.checkpoints, runLookup), []);
     dataState.set(makeKey(DATA_KEYS.releaseHealthChecks, runLookup), [
       {
@@ -156,6 +177,7 @@ describe("ui smoke", () => {
 
     expect(html).toContain("Run Summary");
     expect(html).toContain("Cancel");
+    expect(html).toContain("Checkpoint policy");
     expect(html).toContain("Release Health");
     expect(html).toContain("Operator Interventions");
     expect(html).toContain("Audit Timeline");

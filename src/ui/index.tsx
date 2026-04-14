@@ -21,6 +21,7 @@ import type {
   KnowledgeEntry,
   LearnerSummary,
   OperatorIntervention,
+  PlanningArtifact,
   PreferenceProfile,
   ReleaseHealthCheck,
   RollbackAction,
@@ -29,7 +30,8 @@ import type {
 import { buildRunAuditTimeline } from "../services/audit.js";
 import { getDigestPolicyBenchmarkSummary, getIdeationBenchmarkSummary, getQualityScorecardSummary } from "../services/evaluation-fixtures.js";
 import { classifyFailureMessage, formatFailureCategory } from "../services/failure-taxonomy.js";
-import { summarizeReleaseHealthChecks } from "../services/lifecycle.js";
+import { describeCheckpointPolicy, summarizeReleaseHealthChecks } from "../services/lifecycle.js";
+import { requiresCheckpointForRunGate } from "../services/delivery.js";
 
 const PAGE: CSSProperties = { display: "grid", gap: 16, padding: 20 };
 const CARD: CSSProperties = {
@@ -1007,6 +1009,11 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
     projectId: context.projectId ?? "",
     runId: context.entityId,
   });
+  const { data: planningArtifact } = usePluginData<PlanningArtifact | null>(DATA_KEYS.planningArtifact, {
+    companyId: context.companyId,
+    projectId: context.projectId ?? "",
+    artifactId: run?.artifactId ?? "",
+  });
   const { data: interventions, refresh: refreshInterventions } = usePluginData<OperatorIntervention[]>(DATA_KEYS.operatorInterventions, {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
@@ -1025,6 +1032,10 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
     projectId: context.projectId ?? "",
   });
   const healthSummary = summarizeReleaseHealthChecks(checks ?? []);
+  const checkpointPolicy = requiresCheckpointForRunGate({
+    artifact: planningArtifact ?? undefined,
+    checkpoints: checkpoints ?? [],
+  });
 
   if (!run) {
     return (
@@ -1145,6 +1156,12 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
           <div style={MUTED}>Commit: {activeRun.commitSha ?? "n/a"}</div>
           {classifyFailureMessage(activeRun.error) ? (
             <div style={MUTED}>Failure class: {formatFailureCategory(classifyFailureMessage(activeRun.error))}</div>
+          ) : null}
+          <div style={MUTED}>Checkpoint policy: {describeCheckpointPolicy(planningArtifact ?? undefined)}</div>
+          {checkpointPolicy.required ? (
+            <div style={{ fontSize: 12, color: checkpointPolicy.satisfied ? "#0f766e" : "#b45309" }}>
+              {checkpointPolicy.satisfied ? "Checkpoint requirement satisfied." : "Checkpoint required before risky execution."}
+            </div>
           ) : null}
           {activeRun.pauseReason ? <div style={MUTED}>Pause reason: {activeRun.pauseReason}</div> : null}
           {activeRun.cancellationReason ? <div style={MUTED}>Cancellation reason: {activeRun.cancellationReason}</div> : null}

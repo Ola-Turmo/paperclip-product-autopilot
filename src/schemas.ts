@@ -179,10 +179,16 @@ export const planningArtifactSchema = z.object({
   approvalChecklist: z.array(z.string()),
   executionMode: executionModeSchema,
   approvalMode: approvalModeSchema,
+  checkpointRequired: z.boolean(),
+  checkpointReason: z.string().optional(),
   automationTier: automationTierSchema,
   status: z.enum(["draft", "approved", "in_progress", "completed", "cancelled"]),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
+}).superRefine((artifact, ctx) => {
+  if (artifact.checkpointRequired && !artifact.checkpointReason) {
+    ctx.addIssue({ code: "custom", message: "checkpoint-required plans must include checkpointReason", path: ["checkpointReason"] });
+  }
 });
 
 export const deliveryRunSchema = z.object({

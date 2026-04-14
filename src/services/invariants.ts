@@ -27,6 +27,9 @@ export function validatePlanningArtifactInvariant(artifact: PlanningArtifact): v
   if (artifact.approvalMode === "auto_approve" && artifact.approvalChecklist.length < 2) {
     throw new Error("Auto-approved plans require at least two checklist items");
   }
+  if (artifact.checkpointRequired && !artifact.checkpointReason?.trim()) {
+    throw new Error("Checkpoint-required plans must include checkpointReason");
+  }
 }
 
 export function validateDeliveryRunCreation(input: {

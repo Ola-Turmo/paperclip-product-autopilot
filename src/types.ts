@@ -177,6 +177,8 @@ export interface PlanningArtifact {
   approvalChecklist: string[];
   executionMode: ExecutionMode;
   approvalMode: ApprovalMode;
+  checkpointRequired: boolean;
+  checkpointReason?: string;
   automationTier: AutomationTier;
   status: "draft" | "approved" | "in_progress" | "completed" | "cancelled";
   createdAt: string;

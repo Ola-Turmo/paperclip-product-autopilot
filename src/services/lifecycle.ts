@@ -3,6 +3,7 @@ import type {
   Checkpoint,
   ConvoyTask,
   DeliveryRun,
+  PlanningArtifact,
   ReleaseHealthCheck,
   RollbackAction,
 } from "../types.js";
@@ -164,6 +165,12 @@ export function summarizeReleaseHealthChecks(checks: ReleaseHealthCheck[]): {
   else if (summary.total > 0) summary.overallStatus = "healthy";
 
   return summary;
+}
+
+export function describeCheckpointPolicy(artifact: PlanningArtifact | null | undefined): string {
+  if (!artifact) return "No planning artifact linked to this run.";
+  if (!artifact.checkpointRequired) return "Checkpoint is optional for this run.";
+  return artifact.checkpointReason ?? "Checkpoint is required before high-risk execution.";
 }
 
 export function isTerminalRunStatus(status: string): status is Extract<RunStatus, "completed" | "failed" | "cancelled"> {
