@@ -30,6 +30,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Plugin Smoke
+        run: npm run smoke:plugin
+
       - name: Package Smoke Test
         run: |
           npm pack
