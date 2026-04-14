@@ -136,6 +136,7 @@ describe("runtime schemas", () => {
         companyId: "company-1",
         projectId: "project-1",
         digestType: "stuck_run",
+        dedupeKey: "stuck_run:run-1",
         title: "Stuck",
         summary: "Run stuck",
         details: [],
@@ -144,6 +145,7 @@ describe("runtime schemas", () => {
         deliveredAt: null,
         readAt: null,
         dismissedAt: null,
+        reopenCount: 0,
         createdAt: "2026-01-01T00:00:00.000Z",
       }).digestType,
     ).toBe("stuck_run");
@@ -361,6 +363,7 @@ describe("runtime schemas", () => {
         deliveredAt: null,
         readAt: null,
         dismissedAt: null,
+        cooldownUntil: "2026-01-01T02:00:00.000Z",
         createdAt: "2026-01-01T00:00:00.000Z",
       }),
     ).toThrow();

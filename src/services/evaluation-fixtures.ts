@@ -5,6 +5,7 @@ import { evaluateIdeationReplay } from "./evaluation.js";
 import type { DigestPolicyReplayCase } from "./policy-evaluation.js";
 import { evaluateDigestPolicyReplay } from "./policy-evaluation.js";
 import { buildQualityScorecard } from "./quality-scorecard.js";
+import { applyDigestDismissalCooldown } from "./digest-policy.js";
 
 function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFinding {
   return {
@@ -138,6 +139,42 @@ export const digestPolicyBenchmarkCases: DigestPolicyReplayCase[] = [
       summary: "Budget high",
     }),
     expectedCreate: false,
+  },
+  {
+    caseId: "cooldown-suppressed-stuck-run",
+    existingDigests: [
+      applyDigestDismissalCooldown(
+        createDigest({
+          digestId: "existing-4",
+          status: "dismissed",
+          dismissedAt: "2026-01-01T01:00:00.000Z",
+        }),
+        "2026-01-01T01:00:00.000Z",
+      ),
+    ],
+    candidateDigest: createDigest({
+      digestId: "candidate-4",
+      createdAt: "2026-01-01T03:00:00.000Z",
+    }),
+    expectedCreate: false,
+  },
+  {
+    caseId: "reopen-stuck-run-after-cooldown",
+    existingDigests: [
+      applyDigestDismissalCooldown(
+        createDigest({
+          digestId: "existing-5",
+          status: "dismissed",
+          dismissedAt: "2026-01-01T01:00:00.000Z",
+        }),
+        "2026-01-01T01:00:00.000Z",
+      ),
+    ],
+    candidateDigest: createDigest({
+      digestId: "candidate-5",
+      createdAt: "2026-01-01T08:00:00.000Z",
+    }),
+    expectedCreate: true,
   },
 ];
 

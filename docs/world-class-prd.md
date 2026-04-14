@@ -513,8 +513,8 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [~] Strengthen rollback policy and rollback-action semantics.
 - [~] Add stricter checkpoint restore validation.
 - [~] Add release-health aggregation logic across multiple checks.
-- [ ] Add digest escalation and suppression policy.
-- [ ] Add reopen rules, cooldown windows, and dedupe keys for digests.
+- [~] Add digest escalation and suppression policy.
+- [~] Add reopen rules, cooldown windows, and dedupe keys for digests.
 - [ ] Add explicit policy gates for destructive or risky actions.
 - [ ] Define full-auto boundaries that remain hard-coded supervised.
 - [~] Document governance policy in the repo, not just in code.

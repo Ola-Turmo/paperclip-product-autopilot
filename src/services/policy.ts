@@ -1,4 +1,5 @@
 import type { AutopilotProject, CompanyBudget, DeliveryRun, Digest } from "../types.js";
+import { buildDigestDedupeKey } from "./digest-policy.js";
 
 export function shouldPauseForBudget(
   project: AutopilotProject | null | undefined,
@@ -27,6 +28,10 @@ export function createBudgetAlertDigest(input: {
     companyId: input.companyId,
     projectId: input.projectId,
     digestType: "budget_alert",
+    dedupeKey: buildDigestDedupeKey({
+      digestType: "budget_alert",
+      relatedBudgetId: input.budget.budgetId,
+    }),
     title: `Autopilot budget at ${usagePct}%`,
     summary: `Autopilot has used ${input.budget.autopilotUsedMinutes}/${input.budget.autopilotBudgetMinutes} minutes`,
     details: [],
@@ -35,6 +40,7 @@ export function createBudgetAlertDigest(input: {
     deliveredAt: null,
     readAt: null,
     dismissedAt: null,
+    reopenCount: 0,
     relatedBudgetId: input.budget.budgetId,
     createdAt: input.createdAt,
   };
@@ -54,6 +60,10 @@ export function createStuckRunDigest(input: {
     companyId: input.companyId,
     projectId: input.projectId,
     digestType: "stuck_run",
+    dedupeKey: buildDigestDedupeKey({
+      digestType: "stuck_run",
+      relatedRunId: input.stuckRuns[0]?.runId,
+    }),
     title: `${input.stuckRuns.length} delivery run(s) may be stuck`,
     summary: `Runs not updated in over 60 minutes: ${input.stuckRuns.map((run) => run.runId.slice(0, 8)).join(", ")}`,
     details: input.stuckRuns.map((run) => `${run.runId}: ${run.title} (status: ${run.status})`),
@@ -62,6 +72,7 @@ export function createStuckRunDigest(input: {
     deliveredAt: null,
     readAt: null,
     dismissedAt: null,
+    reopenCount: 0,
     relatedRunId: input.stuckRuns[0]?.runId,
     createdAt: input.createdAt,
   };

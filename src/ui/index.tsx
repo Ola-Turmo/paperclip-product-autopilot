@@ -433,6 +433,16 @@ function DigestsCard(props: { companyId: string; projectId: string; onRefresh: (
               <div style={{ ...MUTED, marginTop: 6 }}>
                 Type {digest.digestType} | Priority {digest.priority}
               </div>
+              {digest.reopenCount ? (
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                  Reopened {digest.reopenCount} time(s)
+                </div>
+              ) : null}
+              {digest.cooldownUntil ? (
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                  Cooldown until {new Date(digest.cooldownUntil).toLocaleString()}
+                </div>
+              ) : null}
               {digest.details.length ? (
                 <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
                   {digest.details[0]}

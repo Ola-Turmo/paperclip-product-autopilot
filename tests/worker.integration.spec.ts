@@ -3,7 +3,7 @@ import { createTestHarness } from "@paperclipai/plugin-sdk/testing";
 import manifest from "../src/manifest.js";
 import plugin from "../src/worker.js";
 import { ACTION_KEYS, ENTITY_TYPES, JOB_KEYS, TOOL_KEYS } from "../src/constants.js";
-import { upsertAutopilotProject, upsertCompanyBudget, upsertDeliveryRun, upsertIdea, upsertPreferenceProfile, upsertResearchCycle, upsertResearchFinding } from "../src/helpers.js";
+import { upsertAutopilotProject, upsertCompanyBudget, upsertDeliveryRun, upsertDigest, upsertIdea, upsertPreferenceProfile, upsertResearchCycle, upsertResearchFinding } from "../src/helpers.js";
 import type { AutopilotProject, CompanyBudget, DeliveryRun, Idea, PreferenceProfile, ResearchCycle, ResearchFinding } from "../src/types.js";
 
 function createProject(overrides: Partial<AutopilotProject> = {}): AutopilotProject {
@@ -319,6 +319,57 @@ describe("worker integration", () => {
     expect(digestTypes.filter((type) => type === "budget_alert")).toHaveLength(1);
     expect(digestTypes.filter((type) => type === "stuck_run")).toHaveLength(1);
     expect(projects[0]?.data.paused).toBe(true);
+  });
+
+  it("suppresses dismissed digests during cooldown and reopens after cooldown", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertCompanyBudget(harness.ctx, createBudget());
+    await upsertDeliveryRun(harness.ctx, createRun({ runId: "run-cooldown" }));
+
+    await harness.runJob(JOB_KEYS.autopilotSweep);
+    const digestsAfterFirstSweep = await harness.ctx.entities.list({
+      entityType: ENTITY_TYPES.digest,
+      scopeKind: "project",
+      scopeId: "project-1",
+    });
+    const stuckDigest = digestsAfterFirstSweep.find((digest) => digest.data.digestType === "stuck_run");
+    expect(stuckDigest).toBeTruthy();
+
+    await harness.performAction(ACTION_KEYS.dismissDigest, {
+      companyId: "company-1",
+      projectId: "project-1",
+      digestId: stuckDigest?.data.digestId,
+    });
+    await harness.runJob(JOB_KEYS.autopilotSweep);
+
+    const digestsDuringCooldown = await harness.ctx.entities.list({
+      entityType: ENTITY_TYPES.digest,
+      scopeKind: "project",
+      scopeId: "project-1",
+    });
+    expect(digestsDuringCooldown.filter((digest) => digest.data.digestType === "stuck_run")).toHaveLength(1);
+
+    await upsertDigest(harness.ctx, {
+      ...stuckDigest?.data,
+      status: "dismissed",
+      dismissedAt: "2026-01-01T01:00:00.000Z",
+      cooldownUntil: "2026-01-01T02:00:00.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    await harness.performAction(ACTION_KEYS.generateStuckRunDigest, {
+      companyId: "company-1",
+      projectId: "project-1",
+    });
+
+    const digestsAfterReopen = await harness.ctx.entities.list({
+      entityType: ENTITY_TYPES.digest,
+      scopeKind: "project",
+      scopeId: "project-1",
+    });
+    const reopenedDigests = digestsAfterReopen.filter((digest) => digest.data.digestType === "stuck_run");
+    expect(reopenedDigests).toHaveLength(2);
+    expect(reopenedDigests.some((digest) => Number(digest.data.reopenCount ?? 0) > 0)).toBe(true);
   });
 
   it("emits metrics and telemetry for checkpoint, health-check, and rollback actions", async () => {

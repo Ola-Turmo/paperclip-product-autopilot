@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Digest } from "../src/types.js";
-import { hasPendingDigestForCandidate } from "../src/services/digest-policy.js";
+import {
+  applyDigestDismissalCooldown,
+  evaluateDigestCreationPolicy,
+  hasPendingDigestForCandidate,
+} from "../src/services/digest-policy.js";
 import { evaluateDigestPolicyReplay } from "../src/services/policy-evaluation.js";
 
 function createDigest(overrides: Partial<Digest> = {}): Digest {
@@ -36,6 +40,42 @@ describe("digest policy", () => {
     )).toBe(false);
   });
 
+  it("suppresses dismissed digests during cooldown and reopens after cooldown", () => {
+    const dismissed = applyDigestDismissalCooldown(
+      {
+        ...createDigest({
+          digestId: "dismissed-1",
+          status: "dismissed",
+          dismissedAt: "2026-01-01T01:00:00.000Z",
+        }),
+      },
+      "2026-01-01T01:00:00.000Z",
+    );
+
+    const suppressed = evaluateDigestCreationPolicy(
+      [dismissed],
+      createDigest({
+        digestId: "candidate-suppressed",
+        createdAt: "2026-01-01T03:00:00.000Z",
+      }),
+      "2026-01-01T03:00:00.000Z",
+    );
+    expect(suppressed.shouldCreate).toBe(false);
+    expect(suppressed.reason).toBe("cooldown_active");
+
+    const reopened = evaluateDigestCreationPolicy(
+      [dismissed],
+      createDigest({
+        digestId: "candidate-reopened",
+        createdAt: "2026-01-01T08:00:00.000Z",
+      }),
+      "2026-01-01T08:00:00.000Z",
+    );
+    expect(reopened.shouldCreate).toBe(true);
+    expect(reopened.reason).toBe("reopened_after_cooldown");
+    expect(reopened.candidate.reopenCount).toBe(1);
+  });
+
   it("evaluates digest policy replay accuracy", () => {
     const summary = evaluateDigestPolicyReplay([
       {
@@ -50,9 +90,39 @@ describe("digest policy", () => {
         candidateDigest: createDigest({ digestId: "candidate-2", relatedRunId: "run-2" }),
         expectedCreate: true,
       },
+      {
+        caseId: "cooldown-suppressed",
+        existingDigests: [
+          applyDigestDismissalCooldown(
+            createDigest({
+              digestId: "dismissed-1",
+              status: "dismissed",
+              dismissedAt: "2026-01-01T01:00:00.000Z",
+            }),
+            "2026-01-01T01:00:00.000Z",
+          ),
+        ],
+        candidateDigest: createDigest({ digestId: "candidate-3", createdAt: "2026-01-01T02:00:00.000Z" }),
+        expectedCreate: false,
+      },
+      {
+        caseId: "reopened-after-cooldown",
+        existingDigests: [
+          applyDigestDismissalCooldown(
+            createDigest({
+              digestId: "dismissed-2",
+              status: "dismissed",
+              dismissedAt: "2026-01-01T01:00:00.000Z",
+            }),
+            "2026-01-01T01:00:00.000Z",
+          ),
+        ],
+        candidateDigest: createDigest({ digestId: "candidate-4", createdAt: "2026-01-01T09:00:00.000Z" }),
+        expectedCreate: true,
+      },
     ]);
 
-    expect(summary.totalCases).toBe(2);
+    expect(summary.totalCases).toBe(4);
     expect(summary.accuracy).toBe(1);
   });
 });

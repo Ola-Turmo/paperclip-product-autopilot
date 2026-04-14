@@ -1,5 +1,5 @@
 import type { Digest } from "../types.js";
-import { hasPendingDigestForCandidate } from "./digest-policy.js";
+import { evaluateDigestCreationPolicy } from "./digest-policy.js";
 
 export interface DigestPolicyReplayCase {
   caseId: string;
@@ -23,7 +23,11 @@ export interface DigestPolicyReplaySummary {
 
 export function evaluateDigestPolicyReplay(cases: DigestPolicyReplayCase[]): DigestPolicyReplaySummary {
   const results = cases.map<DigestPolicyReplayResult>((replayCase) => {
-    const actualCreate = !hasPendingDigestForCandidate(replayCase.existingDigests, replayCase.candidateDigest);
+    const actualCreate = evaluateDigestCreationPolicy(
+      replayCase.existingDigests,
+      replayCase.candidateDigest,
+      replayCase.candidateDigest.createdAt,
+    ).shouldCreate;
     return {
       caseId: replayCase.caseId,
       expectedCreate: replayCase.expectedCreate,

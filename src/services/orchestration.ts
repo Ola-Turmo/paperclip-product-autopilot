@@ -9,7 +9,7 @@ import {
   buildWorkspaceLease,
   shouldCreateDeliveryRun,
 } from "./delivery.js";
-import { hasPendingDigestForCandidate } from "./digest-policy.js";
+import { evaluateDigestCreationPolicy } from "./digest-policy.js";
 import { createBudgetAlertDigest as buildBudgetAlertDigest, createStuckRunDigest as buildStuckRunDigest } from "./policy.js";
 import {
   applySwipeToIdea,
@@ -154,11 +154,11 @@ export async function createBudgetAlertDigest(ctx: PluginContext, companyId: str
   if (!digest) return undefined;
 
   const existingDigests = await repo.listDigests(companyId, projectId);
-  const duplicate = hasPendingDigestForCandidate(existingDigests, digest);
-  if (duplicate) return undefined;
+  const decision = evaluateDigestCreationPolicy(existingDigests, digest, digest.createdAt);
+  if (!decision.shouldCreate) return undefined;
 
-  await repo.upsertDigest(digest);
-  return digest;
+  await repo.upsertDigest(decision.candidate);
+  return decision.candidate;
 }
 
 export async function createStuckRunDigest(ctx: PluginContext, companyId: string, projectId: string) {
@@ -174,9 +174,9 @@ export async function createStuckRunDigest(ctx: PluginContext, companyId: string
   if (!digest) return undefined;
 
   const existingDigests = await repo.listDigests(companyId, projectId);
-  const duplicate = hasPendingDigestForCandidate(existingDigests, digest);
-  if (duplicate) return undefined;
+  const decision = evaluateDigestCreationPolicy(existingDigests, digest, digest.createdAt);
+  if (!decision.shouldCreate) return undefined;
 
-  await repo.upsertDigest(digest);
-  return digest;
+  await repo.upsertDigest(decision.candidate);
+  return decision.candidate;
 }

@@ -391,6 +391,7 @@ export const digestSchema = z.object({
   companyId: z.string().min(1),
   projectId: z.string().min(1),
   digestType: digestTypeSchema,
+  dedupeKey: z.string().optional(),
   title: z.string().min(1),
   summary: z.string().min(1),
   details: z.array(z.string()),
@@ -399,6 +400,8 @@ export const digestSchema = z.object({
   deliveredAt: z.string().nullable(),
   readAt: z.string().nullable(),
   dismissedAt: z.string().nullable(),
+  cooldownUntil: z.string().optional(),
+  reopenCount: z.number().int().nonnegative().optional(),
   relatedRunId: z.string().optional(),
   relatedBudgetId: z.string().optional(),
   createdAt: z.string().min(1),
@@ -416,6 +419,9 @@ export const digestSchema = z.object({
   }
   if (digest.status === "dismissed" && !digest.dismissedAt) {
     ctx.addIssue({ code: "custom", message: "dismissed digests must include dismissedAt", path: ["dismissedAt"] });
+  }
+  if (digest.cooldownUntil && !digest.dismissedAt) {
+    ctx.addIssue({ code: "custom", message: "digest cooldowns require dismissedAt", path: ["cooldownUntil"] });
   }
 });
 

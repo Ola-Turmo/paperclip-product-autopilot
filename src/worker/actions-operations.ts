@@ -10,6 +10,7 @@ import type {
 import { newId, nowIso } from "../helpers.js";
 import { createAutopilotRepository } from "../repositories/autopilot.js";
 import { recordAutopilotEvent } from "../services/observability.js";
+import { applyDigestDismissalCooldown } from "../services/digest-policy.js";
 import {
   createBudgetAlertDigest,
   createStuckRunDigest,
@@ -179,7 +180,11 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
     const digest = digests.find((candidate) => candidate.digestId === a.digestId);
     if (!digest) throw new Error("Digest not found");
     const nextStatus = a.status ?? "dismissed";
-    const updated = transitionDigest(digest, nextStatus, nowIso());
+    const timestamp = nowIso();
+    const updated =
+      nextStatus === "dismissed"
+        ? applyDigestDismissalCooldown(transitionDigest(digest, nextStatus, timestamp), timestamp)
+        : transitionDigest(digest, nextStatus, timestamp);
     await repo.upsertDigest(updated);
     if (nextStatus === "dismissed") {
       await recordAutopilotEvent(ctx, "digestDismissed", a.companyId, {

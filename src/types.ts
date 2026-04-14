@@ -348,6 +348,7 @@ export interface Digest {
   companyId: string;
   projectId: string;
   digestType: DigestType;
+  dedupeKey?: string;
   title: string;
   summary: string;
   details: string[];
@@ -356,6 +357,8 @@ export interface Digest {
   deliveredAt: string | null;
   readAt: string | null;
   dismissedAt: string | null;
+  cooldownUntil?: string;
+  reopenCount?: number;
   relatedRunId?: string;
   relatedBudgetId?: string;
   createdAt: string;
