@@ -1,0 +1,42 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="900" fill="#F6F0E8"/>
+  <rect x="56" y="56" width="1488" height="788" rx="36" fill="url(#bg)"/>
+  <circle cx="1290" cy="168" r="210" fill="#DDE7FF" opacity="0.7"/>
+  <circle cx="1380" cy="720" r="170" fill="#FFE8C6" opacity="0.6"/>
+  <rect x="108" y="120" width="188" height="42" rx="21" fill="#1F3B73"/>
+  <text x="202" y="147" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#F8FAFC">PAPERCLIP PLUGIN</text>
+  <text x="108" y="250" font-family="Arial, Helvetica, sans-serif" font-size="74" font-weight="700" fill="#10203A">Turn product signals</text>
+  <text x="108" y="334" font-family="Arial, Helvetica, sans-serif" font-size="74" font-weight="700" fill="#10203A">into shippable growth</text>
+  <text x="108" y="400" font-family="Arial, Helvetica, sans-serif" font-size="28" fill="#324765">Paperclip Product Autopilot continuously researches, ranks,</text>
+  <text x="108" y="438" font-family="Arial, Helvetica, sans-serif" font-size="28" fill="#324765">reviews, and delivers the next best improvements for your product.</text>
+  <rect x="108" y="492" width="228" height="64" rx="20" fill="#10203A"/>
+  <text x="222" y="532" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#F8FAFC">Evidence-backed</text>
+  <rect x="352" y="492" width="214" height="64" rx="20" fill="#E8EEF9"/>
+  <text x="459" y="532" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#10203A">Human-controlled</text>
+  <rect x="582" y="492" width="200" height="64" rx="20" fill="#FFF3DF"/>
+  <text x="682" y="532" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#8A4B00">Rollback-ready</text>
+  <rect x="874" y="146" width="560" height="608" rx="28" fill="#FCFDFE" stroke="#D7E0EE" stroke-width="2"/>
+  <text x="922" y="208" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#10203A">Autopilot Control Center</text>
+  <rect x="922" y="244" width="464" height="120" rx="22" fill="#EDF3FF"/>
+  <text x="952" y="286" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#143869">Research Pulse</text>
+  <text x="952" y="322" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#35517C">New support-ticket cluster detected</text>
+  <text x="952" y="350" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#35517C">Freshness: High   Source quality: Strong</text>
+  <rect x="922" y="386" width="220" height="146" rx="22" fill="#FFF4E2"/>
+  <text x="952" y="430" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#7A4700">Idea Queue</text>
+  <text x="952" y="470" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="700" fill="#10203A">18</text>
+  <text x="952" y="504" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#6B7A90">ranked opportunities</text>
+  <rect x="1166" y="386" width="220" height="146" rx="22" fill="#EEF9F2"/>
+  <text x="1196" y="430" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#1D6B49">Delivery Runs</text>
+  <text x="1196" y="470" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="700" fill="#10203A">4</text>
+  <text x="1196" y="504" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#6B7A90">active, budget-aware</text>
+  <rect x="922" y="554" width="464" height="162" rx="22" fill="#10203A"/>
+  <text x="952" y="598" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#F8FAFC">Trust Layer</text>
+  <text x="952" y="636" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#D7E3F6">Checkpoints   Digests   Governance   Rollback</text>
+  <text x="952" y="674" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#D7E3F6">Operators stay in control at every risk boundary.</text>
+  <defs>
+    <linearGradient id="bg" x1="56" y1="56" x2="1544" y2="844" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFDFC"/>
+      <stop offset="1" stop-color="#F3F6FB"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -1,0 +1,31 @@
+<svg width="1400" height="620" viewBox="0 0 1400 620" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1400" height="620" rx="32" fill="#FBF7F0"/>
+  <text x="80" y="92" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700" fill="#10203A">The product-improvement loop, made operational</text>
+  <text x="80" y="132" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#4B5F7B">From messy signals to approved shipping work, with evidence and controls at each step.</text>
+  <rect x="80" y="218" width="250" height="260" rx="28" fill="#E8F0FF"/>
+  <text x="114" y="278" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#173E72">1. Discover</text>
+  <text x="114" y="326" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#36527D">Capture research, incidents,</text>
+  <text x="114" y="354" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#36527D">feedback, competitor moves,</text>
+  <text x="114" y="382" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#36527D">and operator context.</text>
+  <rect x="390" y="218" width="250" height="260" rx="28" fill="#FFF2DE"/>
+  <text x="424" y="278" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#8A4B00">2. Score</text>
+  <text x="424" y="326" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#7A5D2F">Deduplicate, rank, explain,</text>
+  <text x="424" y="354" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#7A5D2F">and learn from swipe and</text>
+  <text x="424" y="382" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#7A5D2F">delivery outcomes.</text>
+  <rect x="700" y="218" width="250" height="260" rx="28" fill="#EAF7EE"/>
+  <text x="734" y="278" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#176744">3. Approve</text>
+  <text x="734" y="326" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#356A54">Review with swipes, digest</text>
+  <text x="734" y="354" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#356A54">urgency, checkpoints, and</text>
+  <text x="734" y="382" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#356A54">governance rules.</text>
+  <rect x="1010" y="218" width="250" height="260" rx="28" fill="#EEF0FB"/>
+  <text x="1044" y="278" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#4A3C8E">4. Ship</text>
+  <text x="1044" y="326" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#5E5F86">Run delivery safely with</text>
+  <text x="1044" y="354" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#5E5F86">budgets, locks, health checks,</text>
+  <text x="1044" y="382" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#5E5F86">cancellation, and rollback.</text>
+  <path d="M330 348H390" stroke="#10203A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M640 348H700" stroke="#10203A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M950 348H1010" stroke="#10203A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M376 330L394 348L376 366" stroke="#10203A" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M686 330L704 348L686 366" stroke="#10203A" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M996 330L1014 348L996 366" stroke="#10203A" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

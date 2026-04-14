@@ -1,0 +1,23 @@
+<svg width="1400" height="860" viewBox="0 0 1400 860" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1400" height="860" fill="#F5F1EA"/>
+  <rect x="54" y="54" width="1292" height="752" rx="34" fill="#FFFFFF" stroke="#D8E0EA" stroke-width="2"/>
+  <text x="92" y="112" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700" fill="#10203A">Built for operators who need speed and trust</text>
+  <rect x="92" y="160" width="360" height="258" rx="28" fill="#F2F7FF"/>
+  <text x="124" y="216" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#173E72">Evidence you can inspect</text>
+  <text x="124" y="266" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#35517C">Every idea is tied back to sources,</text>
+  <text x="124" y="294" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#35517C">freshness, confidence, and rationale.</text>
+  <rect x="486" y="160" width="360" height="258" rx="28" fill="#FFF5E5"/>
+  <text x="518" y="216" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#8A4B00">Controls that matter</text>
+  <text x="518" y="266" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#75562E">Checkpoints, budget controls,</text>
+  <text x="518" y="294" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#75562E">digest urgency, pause, resume, cancel.</text>
+  <rect x="880" y="160" width="374" height="258" rx="28" fill="#EEF8F2"/>
+  <text x="912" y="216" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#176744">Safety without dead weight</text>
+  <text x="912" y="266" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#356A54">Governance notes, release health,</text>
+  <text x="912" y="294" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#356A54">rollback policy, and audit timelines.</text>
+  <rect x="92" y="460" width="1162" height="282" rx="28" fill="#10203A"/>
+  <text x="126" y="520" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#F8FAFC">What buyers actually get</text>
+  <text x="126" y="578" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#D6E2F5">A repeatable pipeline for turning product noise into prioritized work.</text>
+  <text x="126" y="616" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#D6E2F5">A review surface that helps leaders move faster without losing control.</text>
+  <text x="126" y="654" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#D6E2F5">A delivery engine that knows when to escalate, when to pause, and when to ship.</text>
+  <text x="126" y="692" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#D6E2F5">A plugin that feels like an operating system for product improvement, not another dashboard.</text>
+</svg>
