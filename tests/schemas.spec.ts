@@ -139,6 +139,8 @@ describe("runtime schemas", () => {
         digestType: "stuck_run",
         dedupeKey: "stuck_run:run-1",
         escalationLevel: 1,
+        urgency: "blocking",
+        recommendedAction: "Review the stuck run and decide whether to nudge, checkpoint, or pause it.",
         title: "Stuck",
         summary: "Run stuck",
         details: [],

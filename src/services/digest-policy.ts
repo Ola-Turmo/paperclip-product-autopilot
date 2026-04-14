@@ -18,6 +18,47 @@ const PRIORITY_WEIGHT: Record<Digest["priority"], number> = {
 
 const PRIORITIES: Digest["priority"][] = ["low", "medium", "high", "critical"];
 
+export function deriveDigestUrgency(input: {
+  digestType: Digest["digestType"];
+  priority: Digest["priority"];
+  escalationLevel?: number;
+}): NonNullable<Digest["urgency"]> {
+  if (input.digestType === "stuck_run") {
+    if ((input.escalationLevel ?? 0) >= 2 || input.priority === "critical") return "intervention_required";
+    return "blocking";
+  }
+  if (input.digestType === "budget_alert") {
+    if (input.priority === "critical") return "blocking";
+    return "attention";
+  }
+  if (input.digestType === "health_check_failed") {
+    return input.priority === "critical" ? "intervention_required" : "blocking";
+  }
+  if (input.priority === "critical") return "intervention_required";
+  if (input.priority === "high") return "attention";
+  return "informational";
+}
+
+export function deriveDigestRecommendedAction(input: {
+  digestType: Digest["digestType"];
+  urgency: NonNullable<Digest["urgency"]>;
+}): string {
+  if (input.digestType === "stuck_run") {
+    return input.urgency === "intervention_required"
+      ? "Inspect the run immediately, add an operator note, and checkpoint or cancel if progress is unsafe."
+      : "Review the stuck run and decide whether to nudge, checkpoint, or pause it.";
+  }
+  if (input.digestType === "budget_alert") {
+    return input.urgency === "blocking"
+      ? "Adjust the budget or pause further autonomous execution before more work starts."
+      : "Review budget burn and decide whether to expand or constrain autopilot time.";
+  }
+  if (input.digestType === "health_check_failed") {
+    return "Inspect the failed health check and decide whether rollback or operator intervention is required.";
+  }
+  return "Review the digest and decide whether operator action is required.";
+}
+
 export function buildDigestDedupeKey(input: {
   digestType: Digest["digestType"];
   relatedRunId?: string;
@@ -123,11 +164,29 @@ export function evaluateDigestCreationPolicy(
           reopenCount,
           escalationLevel,
           priority: escalateDigestPriority(candidate.priority, escalationLevel),
+          urgency: deriveDigestUrgency({
+            digestType: candidate.digestType,
+            priority: escalateDigestPriority(candidate.priority, escalationLevel),
+            escalationLevel,
+          }),
+          recommendedAction: deriveDigestRecommendedAction({
+            digestType: candidate.digestType,
+            urgency: deriveDigestUrgency({
+              digestType: candidate.digestType,
+              priority: escalateDigestPriority(candidate.priority, escalationLevel),
+              escalationLevel,
+            }),
+          }),
         };
       })(),
     };
   }
 
+  const urgency = deriveDigestUrgency({
+    digestType: candidate.digestType,
+    priority: candidate.priority,
+    escalationLevel: candidate.escalationLevel ?? 0,
+  });
   return {
     shouldCreate: true,
     reason: "create",
@@ -136,6 +195,11 @@ export function evaluateDigestCreationPolicy(
       dedupeKey,
       reopenCount: candidate.reopenCount ?? 0,
       escalationLevel: candidate.escalationLevel ?? 0,
+      urgency,
+      recommendedAction: candidate.recommendedAction ?? deriveDigestRecommendedAction({
+        digestType: candidate.digestType,
+        urgency,
+      }),
     },
   };
 }

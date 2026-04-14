@@ -1,5 +1,5 @@
 import type { AutopilotProject, CompanyBudget, DeliveryRun, Digest } from "../types.js";
-import { buildDigestDedupeKey } from "./digest-policy.js";
+import { buildDigestDedupeKey, deriveDigestRecommendedAction, deriveDigestUrgency } from "./digest-policy.js";
 
 export function shouldPauseForBudget(
   project: AutopilotProject | null | undefined,
@@ -23,6 +23,12 @@ export function createBudgetAlertDigest(input: {
   );
   if (usagePct < 80) return null;
 
+  const priority: Digest["priority"] = usagePct >= 95 ? "critical" : "high";
+  const urgency = deriveDigestUrgency({
+    digestType: "budget_alert",
+    priority,
+    escalationLevel: 0,
+  });
   return {
     digestId: input.digestId,
     companyId: input.companyId,
@@ -35,8 +41,13 @@ export function createBudgetAlertDigest(input: {
     title: `Autopilot budget at ${usagePct}%`,
     summary: `Autopilot has used ${input.budget.autopilotUsedMinutes}/${input.budget.autopilotBudgetMinutes} minutes`,
     details: [],
-    priority: usagePct >= 95 ? "critical" : "high",
+    priority,
     escalationLevel: 0,
+    urgency,
+    recommendedAction: deriveDigestRecommendedAction({
+      digestType: "budget_alert",
+      urgency,
+    }),
     status: "pending",
     deliveredAt: null,
     readAt: null,
@@ -56,6 +67,11 @@ export function createStuckRunDigest(input: {
 }): Digest | null {
   if (input.stuckRuns.length === 0) return null;
 
+  const urgency = deriveDigestUrgency({
+    digestType: "stuck_run",
+    priority: "high",
+    escalationLevel: 0,
+  });
   return {
     digestId: input.digestId,
     companyId: input.companyId,
@@ -70,6 +86,11 @@ export function createStuckRunDigest(input: {
     details: input.stuckRuns.map((run) => `${run.runId}: ${run.title} (status: ${run.status})`),
     priority: "high",
     escalationLevel: 0,
+    urgency,
+    recommendedAction: deriveDigestRecommendedAction({
+      digestType: "stuck_run",
+      urgency,
+    }),
     status: "pending",
     deliveredAt: null,
     readAt: null,

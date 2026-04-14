@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Digest } from "../src/types.js";
 import {
   applyDigestDismissalCooldown,
+  deriveDigestRecommendedAction,
+  deriveDigestUrgency,
   evaluateDigestCreationPolicy,
   hasPendingDigestForCandidate,
 } from "../src/services/digest-policy.js";
@@ -40,6 +42,28 @@ describe("digest policy", () => {
     )).toBe(false);
   });
 
+  it("derives urgency and recommended action from digest type and severity", () => {
+    const stuckUrgency = deriveDigestUrgency({
+      digestType: "stuck_run",
+      priority: "critical",
+      escalationLevel: 2,
+    });
+    const budgetUrgency = deriveDigestUrgency({
+      digestType: "budget_alert",
+      priority: "high",
+      escalationLevel: 0,
+    });
+
+    expect(stuckUrgency).toBe("intervention_required");
+    expect(budgetUrgency).toBe("attention");
+    expect(
+      deriveDigestRecommendedAction({
+        digestType: "stuck_run",
+        urgency: stuckUrgency,
+      }),
+    ).toContain("Inspect the run immediately");
+  });
+
   it("suppresses dismissed digests during cooldown and reopens after cooldown", () => {
     const dismissed = applyDigestDismissalCooldown(
       {
@@ -76,6 +100,7 @@ describe("digest policy", () => {
     expect(reopened.candidate.reopenCount).toBe(1);
     expect(reopened.candidate.escalationLevel).toBe(1);
     expect(reopened.candidate.priority).toBe("critical");
+    expect(reopened.candidate.urgency).toBe("intervention_required");
   });
 
   it("escalates repeated reopened digests more aggressively over time", () => {

@@ -365,6 +365,8 @@ export interface Digest {
   digestType: DigestType;
   dedupeKey?: string;
   escalationLevel?: number;
+  urgency?: "informational" | "attention" | "blocking" | "intervention_required";
+  recommendedAction?: string;
   title: string;
   summary: string;
   details: string[];

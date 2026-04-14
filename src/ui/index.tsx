@@ -624,9 +624,19 @@ function DigestsCard(props: { companyId: string; projectId: string; onRefresh: (
               <div style={{ ...MUTED, marginTop: 6 }}>
                 Type {digest.digestType} | Priority {digest.priority}
               </div>
+              {digest.urgency ? (
+                <div style={{ fontSize: 12, color: "#0f172a", marginTop: 6 }}>
+                  Urgency: {digest.urgency.replace(/_/g, " ")}
+                </div>
+              ) : null}
               {Number(digest.escalationLevel ?? 0) > 0 ? (
                 <div style={{ fontSize: 12, color: "#92400e", marginTop: 6 }}>
                   Escalation level {digest.escalationLevel}
+                </div>
+              ) : null}
+              {digest.recommendedAction ? (
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                  Recommended action: {digest.recommendedAction}
                 </div>
               ) : null}
               {digest.reopenCount ? (

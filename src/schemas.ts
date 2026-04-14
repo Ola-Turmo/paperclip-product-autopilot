@@ -31,6 +31,7 @@ const sourceTypeSchema = z.enum([
 ]);
 const digestStatusSchema = z.enum(["pending", "delivered", "read", "dismissed"]);
 const digestPrioritySchema = z.enum(["low", "medium", "high", "critical"]);
+const digestUrgencySchema = z.enum(["informational", "attention", "blocking", "intervention_required"]);
 const digestTypeSchema = z.enum([
   "budget_alert",
   "stuck_run",
@@ -423,6 +424,8 @@ export const digestSchema = z.object({
   digestType: digestTypeSchema,
   dedupeKey: z.string().optional(),
   escalationLevel: z.number().int().nonnegative().optional(),
+  urgency: digestUrgencySchema.optional(),
+  recommendedAction: z.string().optional(),
   title: z.string().min(1),
   summary: z.string().min(1),
   details: z.array(z.string()),
