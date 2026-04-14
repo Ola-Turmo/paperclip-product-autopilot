@@ -16,6 +16,7 @@ import {
   nowIso,
 } from "../helpers.js";
 import { createAutopilotRepository } from "../repositories/autopilot.js";
+import { createResearchFindingRecord } from "../services/research.js";
 import { processSwipeDecision } from "../services/orchestration.js";
 import {
   isNonEmptyString,
@@ -173,9 +174,10 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       confidence?: number;
       sourceUrl?: string;
       sourceLabel?: string;
+      evidenceText?: string;
       category?: ResearchFinding["category"];
     };
-    const finding: ResearchFinding = {
+    const finding = createResearchFindingRecord({
       findingId: newId(),
       companyId: a.companyId,
       projectId: a.projectId,
@@ -185,11 +187,33 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       confidence: a.confidence ?? 0.7,
       sourceUrl: a.sourceUrl,
       sourceLabel: a.sourceLabel,
+      evidenceText: a.evidenceText,
       category: a.category,
       createdAt: nowIso(),
+    });
+    const duplicate = await repo.findDuplicateResearchFinding(a.companyId, a.projectId, {
+      findingId: finding.findingId,
+      title: finding.title,
+      description: finding.description,
+      sourceUrl: finding.sourceUrl,
+      sourceLabel: finding.sourceLabel,
+      category: finding.category,
+      topic: finding.topic,
+      dedupeKey: finding.dedupeKey,
+    });
+    const persistedFinding: ResearchFinding = duplicate
+      ? {
+          ...finding,
+          duplicateOfFindingId: duplicate.finding.findingId,
+          duplicateAnnotated: true,
+        }
+      : finding;
+    await repo.upsertResearchFinding(persistedFinding);
+    return {
+      ...persistedFinding,
+      duplicateSimilarity: duplicate?.similarity,
+      duplicateReasons: duplicate?.reasons,
     };
-    await repo.upsertResearchFinding(finding);
-    return finding;
   });
 
   ctx.actions.register(ACTION_KEYS.createIdea, async (args) => {

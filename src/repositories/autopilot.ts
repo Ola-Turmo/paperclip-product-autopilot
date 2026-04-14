@@ -46,6 +46,7 @@ import {
   upsertWorkspaceLease,
   upsertIdea,
 } from "../helpers.js";
+import { findDuplicateResearchFinding } from "../services/research.js";
 import type {
   AutopilotProject,
   Checkpoint,
@@ -94,6 +95,11 @@ export interface AutopilotRepository {
       sourceReferences?: string[];
     },
   ): Promise<{ idea: Idea; similarity: number; reasons: string[] } | null>;
+  findDuplicateResearchFinding(
+    companyId: string,
+    projectId: string,
+    finding: Pick<ResearchFinding, "findingId" | "title" | "description" | "sourceUrl" | "sourceLabel" | "category" | "topic" | "dedupeKey">,
+  ): Promise<{ finding: ResearchFinding; similarity: number; reasons: string[] } | null>;
   upsertIdea(idea: Idea): Promise<void>;
   upsertSwipeEvent(swipe: SwipeEvent): Promise<void>;
   getPreferenceProfile(companyId: string, projectId: string): Promise<PreferenceProfile | null>;
@@ -151,6 +157,10 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
     listMaybePoolIdeas: (companyId, projectId) => listMaybePoolIdeas(ctx, companyId, projectId),
     findDuplicateIdea: (companyId, projectId, title, description, excludeIdeaId, options) =>
       findDuplicateIdea(ctx, companyId, projectId, title, description, excludeIdeaId, options),
+    findDuplicateResearchFinding: async (companyId, projectId, finding) => {
+      const findings = await listResearchFindings(ctx, companyId, projectId);
+      return findDuplicateResearchFinding(findings, finding);
+    },
     upsertIdea: async (idea) => {
       await upsertIdea(ctx, idea);
     },

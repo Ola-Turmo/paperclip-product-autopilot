@@ -60,6 +60,12 @@ function computePreferenceBoost(
   return ((positive - negative) / total) * 10;
 }
 
+function computeResearchQualityBoost(finding: ResearchFinding): number {
+  const freshnessBoost = ((finding.freshnessScore ?? 50) - 50) / 8;
+  const sourceQualityBoost = ((finding.sourceQualityScore ?? 50) - 50) / 10;
+  return freshnessBoost + sourceQualityBoost;
+}
+
 function normalizeTitle(title: string): string {
   return title
     .replace(/^(improve|fix|investigate|research|address):?\s*/i, "")
@@ -79,6 +85,7 @@ export function scoreFindingForIdea(
 } {
   const confidenceBoost = (finding.confidence - 0.5) * 24;
   const preferenceBoost = computePreferenceBoost(profile, finding.category);
+  const researchQualityBoost = computeResearchQualityBoost(finding);
   const outcomeBoost = computeOutcomeBoost({
     signals: outcomeSignals,
     category: finding.category,
@@ -89,19 +96,24 @@ export function scoreFindingForIdea(
     categoryBaseImpact(finding.category) +
       confidenceBoost +
       preferenceBoost +
+      researchQualityBoost +
       outcomeBoost.boost,
   );
   const feasibilityScore = clampScore(
     categoryBaseFeasibility(finding.category) +
       confidenceBoost / 2 +
       preferenceBoost / 2 +
+      researchQualityBoost / 2 +
       outcomeBoost.boost / 2,
   );
   const rankingScore = clampScore(impactScore * 0.65 + feasibilityScore * 0.35);
   const explanation = [
     `category=${finding.category ?? "general"}`,
     `confidence=${finding.confidence.toFixed(2)}`,
+    `freshness=${finding.freshnessScore}`,
+    `sourceQuality=${finding.sourceQualityScore}`,
     `preferenceBoost=${preferenceBoost.toFixed(1)}`,
+    `researchQualityBoost=${researchQualityBoost.toFixed(1)}`,
     `outcomeBoost=${outcomeBoost.boost.toFixed(1)}`,
     `outcomeEvidence=${outcomeBoost.evidenceCount}`,
     `impact=${impactScore}`,
@@ -117,6 +129,7 @@ export function rankFindingsForIdeation(
   outcomeSignals?: OutcomePreferenceSignals | null,
 ): Array<ResearchFinding & { rankingScore: number; impactScore: number; feasibilityScore: number; explanation: string }> {
   return findings
+    .filter((finding) => !finding.duplicateAnnotated)
     .map((finding) => ({
       ...finding,
       ...scoreFindingForIdea(finding, profile, outcomeSignals),

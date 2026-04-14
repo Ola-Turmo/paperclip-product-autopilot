@@ -105,6 +105,12 @@ function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFindin
     sourceLabel: "support-summary",
     category: "user_feedback",
     confidence: 0.9,
+    signalFamily: "support",
+    topic: "onboarding-completion",
+    dedupeKey: "onboarding-completion|improve onboarding completion",
+    sourceQualityScore: 76,
+    freshnessScore: 90,
+    duplicateAnnotated: false,
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
@@ -481,5 +487,40 @@ describe("worker integration", () => {
     expect(generatedIdea?.data.title).toContain("Improve onboarding completion");
     expect(generatedIdea?.data.sourceReferences).toEqual(["https://example.com/support"]);
     expect(generatedIdea?.data.rationale).toContain("outcomeBoost=");
+  });
+
+  it("annotates duplicate research findings through the action path", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertResearchCycle(harness.ctx, createResearchCycle());
+
+    const first = await harness.performAction<{ findingId: string; duplicateAnnotated: boolean }>(ACTION_KEYS.addResearchFinding, {
+      companyId: "company-1",
+      projectId: "project-1",
+      cycleId: "cycle-1",
+      title: "Improve onboarding completion",
+      description: "Users drop before activation",
+      sourceUrl: "https://example.com/support/1",
+      sourceLabel: "support-summary",
+      category: "user_feedback",
+      confidence: 0.91,
+      evidenceText: "Multiple users reported confusion in the signup flow.",
+    });
+
+    const second = await harness.performAction<{ duplicateAnnotated: boolean; duplicateOfFindingId?: string }>(ACTION_KEYS.addResearchFinding, {
+      companyId: "company-1",
+      projectId: "project-1",
+      cycleId: "cycle-1",
+      title: "Improve onboarding completion",
+      description: "Activation drops during signup flow",
+      sourceUrl: "https://example.com/support/2",
+      sourceLabel: "support-summary",
+      category: "user_feedback",
+      confidence: 0.89,
+      evidenceText: "Another ticket reports similar onboarding confusion.",
+    });
+
+    expect(first.duplicateAnnotated).toBe(false);
+    expect(second.duplicateAnnotated).toBe(true);
+    expect(second.duplicateOfFindingId).toBe(first.findingId);
   });
 });

@@ -82,6 +82,9 @@ export interface ResearchFinding {
   sourceUrl?: string;
   sourceLabel?: string;
   evidenceText?: string;
+  signalFamily?: "support" | "analytics" | "market" | "incident" | "qualitative" | "technical";
+  topic?: string;
+  dedupeKey?: string;
   category?:
     | "opportunity"
     | "threat"
@@ -90,6 +93,10 @@ export interface ResearchFinding {
     | "user_feedback"
     | "technical";
   confidence: number; // 0-1
+  sourceQualityScore: number; // 0-100
+  freshnessScore: number; // 0-100
+  duplicateOfFindingId?: string;
+  duplicateAnnotated: boolean;
   createdAt: string;
 }
 

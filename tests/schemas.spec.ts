@@ -187,6 +187,12 @@ describe("runtime schemas", () => {
         description: "Users drop before activation",
         category: "user_feedback",
         confidence: 0.92,
+        signalFamily: "support",
+        topic: "onboarding-completion",
+        dedupeKey: "onboarding-completion|improve onboarding completion",
+        sourceQualityScore: 72,
+        freshnessScore: 88,
+        duplicateAnnotated: false,
         createdAt: "2026-01-01T00:00:00.000Z",
       }).findingId,
     ).toBe("finding-1");
@@ -381,6 +387,23 @@ describe("runtime schemas", () => {
         checkId: "check-1",
         rollbackType: "revert_commit",
         status: "pending",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ).toThrow();
+
+    expect(() =>
+      researchFindingSchema.parse({
+        findingId: "finding-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        cycleId: "cycle-1",
+        title: "Improve onboarding completion",
+        description: "Users drop before activation",
+        category: "user_feedback",
+        confidence: 0.92,
+        sourceQualityScore: 72,
+        freshnessScore: 88,
+        duplicateAnnotated: true,
         createdAt: "2026-01-01T00:00:00.000Z",
       }),
     ).toThrow();

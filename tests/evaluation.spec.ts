@@ -12,6 +12,12 @@ function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFindin
     description: "Users drop before activation",
     category: "user_feedback",
     confidence: 0.9,
+    signalFamily: "support",
+    topic: "onboarding-completion",
+    dedupeKey: "onboarding-completion|improve onboarding completion",
+    sourceQualityScore: 72,
+    freshnessScore: 88,
+    duplicateAnnotated: false,
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };

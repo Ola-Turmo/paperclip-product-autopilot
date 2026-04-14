@@ -5,7 +5,7 @@
 Status: Draft  
 Owner: Ola-Turmo  
 Repo: `Ola-Turmo/paperclip-product-autopilot`  
-Last updated: 2026-04-12
+Last updated: 2026-04-14
 
 ## 1. Executive Summary
 
@@ -472,12 +472,12 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 ### 16.4 Research intelligence
 
 - [ ] Define signal-ingestion interfaces for research inputs.
-- [ ] Add first-class provenance fields and source-quality scoring.
-- [ ] Add freshness and confidence policies for findings.
-- [ ] Add deduplication for research findings, not just ideas.
-- [ ] Add support for grouping findings by signal family and topic.
+- [~] Add first-class provenance fields and source-quality scoring.
+- [~] Add freshness and confidence policies for findings.
+- [~] Add deduplication for research findings, not just ideas.
+- [~] Add support for grouping findings by signal family and topic.
 - [ ] Add reproducible research-cycle snapshots.
-- [ ] Add deterministic tests for provenance, dedupe, and freshness behavior.
+- [~] Add deterministic tests for provenance, dedupe, and freshness behavior.
 
 ### 16.5 Idea generation and ranking
 
@@ -593,4 +593,4 @@ This project can credibly claim to be state of the art only when all of the foll
 
 The single best next step is:
 
-- Finish the state-machine rollout by covering digest transitions, remaining handler paths, and invariant enforcement, then continue the repository-layer adoption across the remaining action and tool modules with stronger tests around those boundaries.
+- Finish the remaining research-intelligence layer by adding reproducible cycle snapshots and deeper provenance handling, then keep tightening invariant helpers and operator intervention workflows.
