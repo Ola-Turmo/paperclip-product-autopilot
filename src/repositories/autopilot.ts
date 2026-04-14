@@ -8,6 +8,7 @@ import {
   getCompanyBudget,
   getDeliveryRun,
   getIdea,
+  getPlanningArtifact,
   getPreferenceProfile,
   listDeliveryRuns,
   listAutopilotProjectEntities,
@@ -19,12 +20,15 @@ import {
   listKnowledgeEntries,
   listLearnerSummaries,
   listOperatorInterventions,
+  listPlanningArtifacts,
   listProductLocks,
+  listProductProgramRevisions,
   listReleaseHealthChecks,
   listRollbackActions,
   listResearchCycles,
   listResearchFindings,
   listStuckRuns,
+  listSwipeEvents,
   upsertAutopilotProject,
   upsertCompanyBudget,
   upsertCheckpoint,
@@ -76,6 +80,7 @@ export interface AutopilotRepository {
   getAutopilotProject(companyId: string, projectId: string): Promise<AutopilotProject | null>;
   upsertAutopilotProject(project: AutopilotProject): Promise<void>;
   getLatestProductProgram(companyId: string, projectId: string): Promise<ProductProgramRevision | null>;
+  listProductProgramRevisions(companyId: string, projectId: string): Promise<ProductProgramRevision[]>;
   upsertProductProgramRevision(revision: ProductProgramRevision): Promise<void>;
   getDeliveryRun(companyId: string, projectId: string, runId: string): Promise<DeliveryRun | null>;
   listDeliveryRuns(companyId: string, projectId: string, status?: RunStatus): Promise<DeliveryRun[]>;
@@ -104,10 +109,13 @@ export interface AutopilotRepository {
   upsertSwipeEvent(swipe: SwipeEvent): Promise<void>;
   getPreferenceProfile(companyId: string, projectId: string): Promise<PreferenceProfile | null>;
   upsertPreferenceProfile(profile: PreferenceProfile): Promise<void>;
+  listSwipeEvents(companyId: string, projectId: string, limit?: number): Promise<SwipeEvent[]>;
   listResearchCycles(companyId: string, projectId?: string): Promise<ResearchCycle[]>;
   upsertResearchCycle(cycle: ResearchCycle): Promise<void>;
   upsertResearchFinding(finding: ResearchFinding): Promise<void>;
   listResearchFindings(companyId: string, projectId: string, cycleId?: string): Promise<ResearchFinding[]>;
+  getPlanningArtifact(companyId: string, projectId: string, artifactId: string): Promise<PlanningArtifact | null>;
+  listPlanningArtifacts(companyId: string, projectId: string, ideaId?: string): Promise<PlanningArtifact[]>;
   upsertPlanningArtifact(artifact: PlanningArtifact): Promise<void>;
   upsertDeliveryRun(run: DeliveryRun): Promise<void>;
   upsertWorkspaceLease(lease: WorkspaceLease): Promise<void>;
@@ -146,6 +154,7 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
       await upsertAutopilotProject(ctx, project);
     },
     getLatestProductProgram: (companyId, projectId) => getLatestProductProgram(ctx, companyId, projectId),
+    listProductProgramRevisions: (companyId, projectId) => listProductProgramRevisions(ctx, companyId, projectId),
     upsertProductProgramRevision: async (revision) => {
       await upsertProductProgramRevision(ctx, revision);
     },
@@ -171,6 +180,7 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
     upsertPreferenceProfile: async (profile) => {
       await upsertPreferenceProfile(ctx, profile);
     },
+    listSwipeEvents: (companyId, projectId, limit) => listSwipeEvents(ctx, companyId, projectId, limit),
     listResearchCycles: (companyId, projectId) => listResearchCycles(ctx, companyId, projectId),
     upsertResearchCycle: async (cycle) => {
       await upsertResearchCycle(ctx, cycle);
@@ -179,6 +189,8 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
       await upsertResearchFinding(ctx, finding);
     },
     listResearchFindings: (companyId, projectId, cycleId) => listResearchFindings(ctx, companyId, projectId, cycleId),
+    getPlanningArtifact: (companyId, projectId, artifactId) => getPlanningArtifact(ctx, companyId, projectId, artifactId),
+    listPlanningArtifacts: (companyId, projectId, ideaId) => listPlanningArtifacts(ctx, companyId, projectId, ideaId),
     upsertPlanningArtifact: async (artifact) => {
       await upsertPlanningArtifact(ctx, artifact);
     },

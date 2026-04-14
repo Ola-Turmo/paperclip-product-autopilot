@@ -11,7 +11,9 @@ import type {
   ProductProgramRevision,
   ResearchCycle,
   ResearchFinding,
+  SwipeEvent,
   WorkspaceLease,
+  PlanningArtifact,
 } from "../src/types.js";
 
 function createProject(overrides: Partial<AutopilotProject> = {}): AutopilotProject {
@@ -168,6 +170,41 @@ function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFindin
   };
 }
 
+function createSwipeEvent(overrides: Partial<SwipeEvent> = {}): SwipeEvent {
+  return {
+    swipeId: "swipe-1",
+    companyId: "company-1",
+    projectId: "project-1",
+    ideaId: "idea-1",
+    decision: "yes",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function createPlanningArtifact(overrides: Partial<PlanningArtifact> = {}): PlanningArtifact {
+  return {
+    artifactId: "artifact-1",
+    companyId: "company-1",
+    projectId: "project-1",
+    ideaId: "idea-1",
+    title: "Plan onboarding",
+    goalAlignmentSummary: "Reduce activation dropoff",
+    implementationSpec: "Update copy and simplify first-run steps",
+    dependencies: [],
+    rolloutPlan: "Release behind a flag",
+    testPlan: "Add flow coverage",
+    approvalChecklist: ["Review UX copy"],
+    executionMode: "simple",
+    approvalMode: "manual",
+    automationTier: "supervised",
+    status: "draft",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 describe("autopilot repository", () => {
   let harness: ReturnType<typeof createTestHarness>;
 
@@ -264,5 +301,20 @@ describe("autopilot repository", () => {
     expect(running).toHaveLength(1);
     expect(completed).toHaveLength(1);
     expect(completed[0]?.runId).toBe("run-2");
+  });
+
+  it("round-trips swipe events and planning artifacts through the repository", async () => {
+    const repo = createAutopilotRepository(harness.ctx);
+    await repo.upsertSwipeEvent(createSwipeEvent());
+    await repo.upsertPlanningArtifact(createPlanningArtifact());
+
+    const events = await repo.listSwipeEvents("company-1", "project-1");
+    const artifact = await repo.getPlanningArtifact("company-1", "project-1", "artifact-1");
+    const artifacts = await repo.listPlanningArtifacts("company-1", "project-1");
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.swipeId).toBe("swipe-1");
+    expect(artifact?.artifactId).toBe("artifact-1");
+    expect(artifacts).toHaveLength(1);
   });
 });
