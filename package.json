@@ -8,7 +8,8 @@
     "build:rollup": "rollup -c",
     "dev": "node esbuild.config.mjs --watch",
     "dev:ui": "paperclip-plugin-dev-server --root . --ui-dir dist/ui --port 4178",
-    "prepack": "npm run typecheck && npm run test && npm run build && npm run smoke:plugin",
+    "prepack": "npm run typecheck && npm run test && npm run build && npm run smoke:plugin && npm run smoke:devserver",
+    "smoke:devserver": "node scripts/dev-server-smoke.mjs",
     "smoke:plugin": "node scripts/plugin-smoke.mjs",
     "test": "vitest run --config ./vitest.config.ts",
     "typecheck": "tsc --noEmit"

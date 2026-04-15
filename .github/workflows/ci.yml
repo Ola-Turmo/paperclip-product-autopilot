@@ -33,6 +33,9 @@ jobs:
       - name: Plugin Smoke
         run: npm run smoke:plugin
 
+      - name: Dev Server Smoke
+        run: npm run smoke:devserver
+
       - name: Package Smoke Test
         run: |
           npm pack
