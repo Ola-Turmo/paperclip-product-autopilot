@@ -6,6 +6,13 @@ Turn scattered product signals into ranked, reviewable, shippable improvements.
 
 Paperclip Product Autopilot is a product operating system for teams that want more output without handing the wheel to a reckless agent. It continuously discovers opportunities, scores them against real evidence, routes them through human review, and executes approved delivery runs with checkpoints, budgets, digests, governance, and rollback.
 
+The core value is not "AI ideas". The core value is a disciplined loop:
+
+- ingest product signal
+- rank what matters
+- let humans approve risk
+- ship through controlled runs
+
 ## Why This Exists
 
 Most teams already have enough signal:
@@ -27,7 +34,9 @@ Product Autopilot closes that gap. It gives founders, product leads, and staff e
 - learn from operator decisions
 - ship work safely inside clear boundaries
 
-## What Buyers Get
+## Core Engine
+
+What exists today at the core of the app:
 
 - **A research engine** that captures fresh signals, normalizes provenance, scores source quality, and snapshots research cycles.
 - **A ranking engine** that deduplicates ideas, explains scoring, and learns from swipe behavior and delivery outcomes.
@@ -72,6 +81,19 @@ It is designed to behave like a disciplined product team member:
 4. **Ship**  
    Run safe delivery flows with budgets, locks, health checks, cancellation, and rollback paths.
 
+## What Is Still Missing
+
+The core is credible, but not finished in the absolute sense. The main missing pieces are:
+
+- **Real signal connectors in production**  
+  The internal research model is strong, but the app still needs more live source adapters for support, analytics, incidents, and market inputs.
+
+- **A fully wired execution backend**  
+  The delivery model is strong, but the strongest version of the product needs tighter coupling to the real coding and shipping executor used by the team.
+
+- **More live host proof, not just local proof**  
+  Packaging, SDK harnesses, worker boot, UI serving, and smoke tests are in place. The next bar is more repeatable validation against a live Paperclip host with actual tool execution.
+
 ## Operator-Grade Trust Layer
 
 ![Operator experience](./assets/readme/autopilot-operators.svg)
@@ -96,6 +118,13 @@ Today the repo includes:
 - delivery lifecycle, cancellation, and health monitoring
 - digest cooldown, reopen, escalation, urgency, and recommended actions
 - operator UI for ideas, runs, digests, budgets, learning, and audit history
+
+That means the app is already strong at the center of the loop:
+
+- understand signal
+- prioritize opportunities
+- keep humans in control
+- execute inside visible safety constraints
 
 ## Install
 
