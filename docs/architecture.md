@@ -21,6 +21,8 @@ Paperclip Product Autopilot is structured around four layers:
 - `delivery.ts`, `lifecycle.ts`, `state-machines.ts`, `invariants.ts`, and `rollback-policy.ts` are safety and execution services.
 - `overview.ts`, `audit.ts`, `policy.ts`, `policy-evaluation.ts`, and `quality-scorecard.ts` are read-model and evaluation services.
 - `observability.ts` and `event-taxonomy.ts` own counters, duration metrics, and telemetry naming.
+- `signal-ingestion.ts` defines the adapter boundary for Paperclip data, other plugins, and external live sources.
+- `execution-backend.ts` defines the operational contract between Autopilot delivery runs and the real coding or shipping executor.
 
 ## Current invariants
 
@@ -35,3 +37,5 @@ Paperclip Product Autopilot is structured around four layers:
 - New Paperclip handlers should stay thin and delegate to repository and service layers.
 - New persisted entity types should add both runtime schema coverage and repository methods.
 - New autonomy features should ship with replay fixtures or regression tests before being surfaced in the UI.
+- New live data sources should enter through `SignalSourceAdapter` rather than custom ingestion logic inside worker handlers.
+- New execution engines should satisfy the execution-backend contract before they are allowed to drive non-supervised runs.
