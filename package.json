@@ -22,7 +22,7 @@
     "dist",
     "assets/readme",
     "README.md",
-    "docs/world-class-prd.md"
+    "docs"
   ],
   "paperclipPlugin": {
     "manifest": "./dist/manifest.js",

@@ -197,6 +197,22 @@ docs/
   world-class-prd.md
 ```
 
+## Documentation
+
+Start here depending on what you need:
+
+- [End-User Test Guide](./docs/usertest.md)
+- [Architecture](./docs/architecture.md)
+- [Data Model](./docs/data-model.md)
+- [Operator Guide](./docs/operator-guide.md)
+- [Contributor Guide](./docs/contributor-guide.md)
+- [World-Class PRD](./docs/world-class-prd.md)
+- [Final-Mile PRD](./docs/final-mile-prd.md)
+- [Signal Ingestion Contract](./docs/signal-ingestion-contract.md)
+- [Execution Backend Contract](./docs/execution-backend-contract.md)
+- [Live Host Validation](./docs/live-host-validation.md)
+- [Kommune UI Review](./docs/kommune-review/report.md)
+
 ## Positioning
 
 Paperclip Product Autopilot is for teams that want an always-on product improvement engine without sacrificing reviewability, control, or delivery safety.
