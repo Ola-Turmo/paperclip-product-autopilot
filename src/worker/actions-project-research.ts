@@ -37,6 +37,7 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
 
     const existing = await repo.getAutopilotProject(a.companyId, a.projectId);
     const now = nowIso();
+    const paused = a.paused ?? existing?.paused ?? false;
     const autopilot: AutopilotProject = {
       autopilotId: existing?.autopilotId ?? newId(),
       companyId: a.companyId,
@@ -44,16 +45,17 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       enabled: a.enabled ?? existing?.enabled ?? false,
       automationTier: parseAutomationTier(a.automationTier, existing?.automationTier),
       budgetMinutes: parsePositiveInt(a.budgetMinutes, existing?.budgetMinutes ?? 120),
-      repoUrl: a.repoUrl,
-      workspaceId: a.workspaceId,
-      liveUrl: a.liveUrl,
-      productType: a.productType,
-      paused: a.paused ?? existing?.paused ?? false,
-      pauseReason: a.pauseReason,
-      researchScheduleCron: a.researchScheduleCron,
-      ideationScheduleCron: a.ideationScheduleCron,
-      maybePoolResurfaceDays: a.maybePoolResurfaceDays,
-      maxIdeasPerCycle: a.maxIdeasPerCycle,
+      repoUrl: a.repoUrl ?? existing?.repoUrl,
+      workspaceId: a.workspaceId ?? existing?.workspaceId,
+      liveUrl: a.liveUrl ?? existing?.liveUrl,
+      productType: a.productType ?? existing?.productType,
+      agentId: a.agentId ?? existing?.agentId,
+      paused,
+      pauseReason: paused ? (a.pauseReason ?? existing?.pauseReason) : undefined,
+      researchScheduleCron: a.researchScheduleCron ?? existing?.researchScheduleCron,
+      ideationScheduleCron: a.ideationScheduleCron ?? existing?.ideationScheduleCron,
+      maybePoolResurfaceDays: a.maybePoolResurfaceDays ?? existing?.maybePoolResurfaceDays,
+      maxIdeasPerCycle: a.maxIdeasPerCycle ?? existing?.maxIdeasPerCycle,
       autoCreateIssues: a.autoCreateIssues ?? existing?.autoCreateIssues ?? true,
       autoCreatePrs: a.autoCreatePrs ?? existing?.autoCreatePrs ?? false,
       createdAt: existing?.createdAt ?? now,

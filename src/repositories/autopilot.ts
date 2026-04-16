@@ -50,6 +50,7 @@ import {
   upsertWorkspaceLease,
   upsertIdea,
 } from "../helpers.js";
+import { autopilotProjectSchema } from "../schemas.js";
 import { findDuplicateResearchFinding } from "../services/research.js";
 import type {
   AutopilotProject,
@@ -147,7 +148,7 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
   return {
     listAutopilotProjects: async (companyId) => {
       const entities = await listAutopilotProjectEntities(ctx, companyId);
-      return entities.map((entity) => entity.data as unknown as AutopilotProject);
+      return entities.map((entity) => autopilotProjectSchema.parse(entity.data));
     },
     getAutopilotProject: (companyId, projectId) => getAutopilotProject(ctx, companyId, projectId),
     upsertAutopilotProject: async (project) => {

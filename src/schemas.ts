@@ -69,6 +69,16 @@ export const autopilotProjectSchema = z.object({
   updatedAt: z.string().min(1),
 });
 
+export const productProgramRevisionSchema = z.object({
+  revisionId: z.string().min(1),
+  companyId: z.string().min(1),
+  projectId: z.string().min(1),
+  content: z.string().min(1),
+  version: z.number().int().positive(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+});
+
 export const researchCycleSchema = z.object({
   cycleId: z.string().min(1),
   companyId: z.string().min(1),

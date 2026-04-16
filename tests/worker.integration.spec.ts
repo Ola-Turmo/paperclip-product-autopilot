@@ -150,6 +150,48 @@ describe("worker integration", () => {
     await plugin.definition.setup(harness.ctx);
   });
 
+  it("preserves existing project configuration on partial settings saves", async () => {
+    const first = await harness.performAction<AutopilotProject>(ACTION_KEYS.saveAutopilotProject, {
+      companyId: "company-1",
+      projectId: "project-1",
+      enabled: true,
+      automationTier: "semiauto",
+      budgetMinutes: 180,
+      repoUrl: "https://github.com/example/repo",
+      workspaceId: "/tmp/project",
+      liveUrl: "https://app.example.com",
+      productType: "saas",
+      agentId: "agent-123",
+      paused: true,
+      pauseReason: "Waiting for review",
+      researchScheduleCron: "0 8 * * *",
+      ideationScheduleCron: "0 9 * * *",
+      maybePoolResurfaceDays: 21,
+      maxIdeasPerCycle: 7,
+      autoCreateIssues: true,
+      autoCreatePrs: false,
+    });
+
+    const second = await harness.performAction<AutopilotProject>(ACTION_KEYS.saveAutopilotProject, {
+      companyId: "company-1",
+      projectId: "project-1",
+      budgetMinutes: 240,
+    });
+
+    expect(first.autopilotId).toBe(second.autopilotId);
+    expect(second.repoUrl).toBe("https://github.com/example/repo");
+    expect(second.workspaceId).toBe("/tmp/project");
+    expect(second.liveUrl).toBe("https://app.example.com");
+    expect(second.productType).toBe("saas");
+    expect(second.agentId).toBe("agent-123");
+    expect(second.pauseReason).toBe("Waiting for review");
+    expect(second.researchScheduleCron).toBe("0 8 * * *");
+    expect(second.ideationScheduleCron).toBe("0 9 * * *");
+    expect(second.maybePoolResurfaceDays).toBe(21);
+    expect(second.maxIdeasPerCycle).toBe(7);
+    expect(second.budgetMinutes).toBe(240);
+  });
+
   it("records a swipe and creates planning plus delivery artifacts when autopilot is active", async () => {
     await upsertAutopilotProject(harness.ctx, createProject());
     await upsertIdea(harness.ctx, createIdea());

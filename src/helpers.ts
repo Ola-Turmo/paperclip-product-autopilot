@@ -45,6 +45,7 @@ import {
   planningArtifactSchema,
   preferenceProfileSchema,
   productLockSchema,
+  productProgramRevisionSchema,
   releaseHealthCheckSchema,
   rollbackActionSchema,
   researchFindingSchema,
@@ -184,14 +185,15 @@ export async function upsertProductProgramRevision(
   ctx: PluginContext,
   rev: ProductProgramRevision
 ): Promise<PluginEntityRecord> {
+  const validated = validateEntity(productProgramRevisionSchema, rev);
   return ctx.entities.upsert({
     entityType: ENTITY_TYPES.productProgramRevision,
     scopeKind: "project",
-    scopeId: rev.projectId,
-    externalId: rev.revisionId,
-    title: `Program v${rev.version}`,
+    scopeId: validated.projectId,
+    externalId: validated.revisionId,
+    title: `Program v${validated.version}`,
     status: "active",
-    data: rev as unknown as Record<string, unknown>,
+    data: validated as unknown as Record<string, unknown>,
   });
 }
 

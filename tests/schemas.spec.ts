@@ -11,6 +11,7 @@ import {
   learnerSummarySchema,
   operatorInterventionSchema,
   planningArtifactSchema,
+  productProgramRevisionSchema,
   productLockSchema,
   releaseHealthCheckSchema,
   researchFindingSchema,
@@ -36,6 +37,20 @@ describe("runtime schemas", () => {
     });
 
     expect(parsed.projectId).toBe("project-1");
+  });
+
+  it("accepts a valid product program revision", () => {
+    const parsed = productProgramRevisionSchema.parse({
+      revisionId: "rev-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      content: "Focus on onboarding and activation",
+      version: 1,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(parsed.version).toBe(1);
   });
 
   it("rejects an invalid automation tier", () => {
