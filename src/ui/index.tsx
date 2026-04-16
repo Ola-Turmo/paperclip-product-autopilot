@@ -33,62 +33,111 @@ import { classifyFailureMessage, formatFailureCategory } from "../services/failu
 import { describeCheckpointPolicy, summarizeReleaseHealthChecks } from "../services/lifecycle.js";
 import { requiresCheckpointForRunGate } from "../services/delivery.js";
 
-const PAGE: CSSProperties = { display: "grid", gap: 16, padding: 20 };
+const PAGE: CSSProperties = {
+  display: "grid",
+  gap: 18,
+  padding: 20,
+  alignContent: "start",
+};
 const CARD: CSSProperties = {
-  border: "1px solid rgba(148, 163, 184, 0.3)",
-  borderRadius: 14,
-  padding: 16,
-  background: "#fff",
-  boxShadow: "0 10px 24px rgba(15, 23, 42, 0.05)",
+  border: "1px solid rgba(11, 52, 68, 0.08)",
+  borderRadius: 18,
+  padding: 18,
+  background: "#ffffff",
+  boxShadow: "0 16px 36px rgba(11, 52, 68, 0.08)",
 };
 const GRID: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-  gap: 12,
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 14,
 };
-const LABEL: CSSProperties = { fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase" };
+const LAYOUT: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+  gap: 18,
+  alignItems: "start",
+};
+const LABEL: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 800,
+  color: "#64748b",
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+};
 const INPUT: CSSProperties = {
   width: "100%",
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid #cbd5e1",
+  padding: "11px 13px",
+  borderRadius: 12,
+  border: "1px solid rgba(11, 52, 68, 0.12)",
   background: "#fff",
   fontSize: 14,
   boxSizing: "border-box",
+  color: "#0B3444",
 };
 const BUTTON: CSSProperties = {
-  padding: "10px 14px",
-  borderRadius: 10,
-  border: "1px solid #0f172a",
-  background: "#0f172a",
+  padding: "10px 15px",
+  borderRadius: 14,
+  border: "1px solid #115E59",
+  background: "#115E59",
   color: "#fff",
   cursor: "pointer",
   fontSize: 13,
-  fontWeight: 600,
+  fontWeight: 700,
+  boxShadow: "0 12px 22px rgba(17, 94, 89, 0.18)",
 };
 const BUTTON_SECONDARY: CSSProperties = {
   ...BUTTON,
   background: "#fff",
-  color: "#0f172a",
+  color: "#0B3444",
+  border: "1px solid rgba(11, 52, 68, 0.15)",
+  boxShadow: "none",
 };
-const MUTED: CSSProperties = { fontSize: 13, color: "#64748b" };
+const MUTED: CSSProperties = { fontSize: 13, color: "rgba(11, 52, 68, 0.68)", lineHeight: 1.5 };
 const EMPTY_PANEL: CSSProperties = {
-  border: "1px dashed #cbd5e1",
-  borderRadius: 12,
-  padding: 16,
-  background: "#f8fafc",
+  border: "1px dashed rgba(11, 52, 68, 0.14)",
+  borderRadius: 16,
+  padding: 18,
+  background: "#F5F7FA",
   display: "grid",
-  gap: 6,
+  gap: 8,
+};
+const METRIC_CARD: CSSProperties = {
+  ...CARD,
+  padding: 16,
+  boxShadow: "none",
+  border: "1px solid rgba(11, 52, 68, 0.08)",
+};
+const HERO_CARD: CSSProperties = {
+  ...CARD,
+  padding: 24,
+  background: "linear-gradient(180deg, #ffffff 0%, #F5F7FA 100%)",
+  color: "#0B3444",
+  boxShadow: "0 20px 48px rgba(11, 52, 68, 0.08)",
 };
 const STATUS: Record<string, string> = {
-  active: "#16a34a",
-  approved: "#2563eb",
-  maybe: "#d97706",
-  rejected: "#dc2626",
-  running: "#2563eb",
-  completed: "#16a34a",
-  failed: "#dc2626",
-  paused: "#d97706",
+  active: "#115E59",
+  approved: "#0E7490",
+  maybe: "#B45309",
+  rejected: "#DC2626",
+  running: "#0E7490",
+  completed: "#115E59",
+  failed: "#DC2626",
+  paused: "#B45309",
+};
+const STATUS_LABELS: Record<string, string> = {
+  active: "aktiv",
+  approved: "godkjent",
+  maybe: "kanskje",
+  rejected: "avvist",
+  running: "kjører",
+  completed: "fullført",
+  failed: "feilet",
+  paused: "pauset",
+  pending: "venter",
+  delivered: "sendt",
+  read: "lest",
+  dismissed: "lukket",
+  cancelled: "avbrutt",
 };
 
 function toastError(toast: ReturnType<typeof usePluginToast>, title: string, error: unknown) {
@@ -114,7 +163,7 @@ function StatusPill({ status }: { status: string }) {
         background: `${color}18`,
         color,
       }}
-    >
+      >
       <span
         style={{
           width: 8,
@@ -124,17 +173,23 @@ function StatusPill({ status }: { status: string }) {
           display: "inline-block",
         }}
       />
-      {status.replace(/_/g, " ")}
+      {STATUS_LABELS[status] ?? status.replace(/_/g, " ")}
     </span>
   );
 }
 
-function Section(props: { title: string; children: ReactNode; action?: ReactNode }) {
+function Section(props: { title: string; subtitle?: string; children: ReactNode; action?: ReactNode }) {
   return (
     <section style={CARD}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 12, alignItems: "center" }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{props.title}</div>
-        {props.action}
+      <div style={{ display: "grid", gap: 12, marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
+          <div style={{ display: "grid", gap: 5 }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#0f172a" }}>{props.title}</div>
+            {props.subtitle ? <div style={{ ...MUTED, maxWidth: 720 }}>{props.subtitle}</div> : null}
+          </div>
+          {props.action}
+        </div>
+        <div style={{ height: 1, background: "linear-gradient(90deg, rgba(148,163,184,0.35) 0%, rgba(148,163,184,0.08) 100%)" }} />
       </div>
       {props.children}
     </section>
@@ -164,6 +219,58 @@ function extractRationaleSignal(rationale: string | undefined, key: string): str
   if (!rationale) return null;
   const match = rationale.match(new RegExp(`${key}=([^,]+)`));
   return match?.[1]?.trim() ?? null;
+}
+
+function OverviewHero(props: { project: AutopilotProject | null; overview: AutopilotOverview }) {
+  const projectLabel = props.project?.productType ?? "digital tjeneste";
+  const tier = props.project?.automationTier ?? "supervised";
+  const strongestSignal =
+    props.overview.failedRunsCount > 0
+      ? "Feilede løp krever oppfølging"
+      : props.overview.runningRunsCount > 0
+        ? "Aktive leveringsløp pågår"
+        : "Stabil operativ status";
+
+  return (
+    <section style={HERO_CARD}>
+      <div style={{ display: "grid", gap: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start", flexWrap: "wrap" }}>
+          <div style={{ display: "grid", gap: 8, maxWidth: 760 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#115E59" }}>
+              Kommunal operatørflate
+            </div>
+            <div style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.05, fontFamily: "\"Playfair Display\", Georgia, serif" }}>
+              Product Autopilot for {projectLabel}
+            </div>
+            <div style={{ fontSize: 15, lineHeight: 1.6, color: "rgba(11, 52, 68, 0.76)" }}>
+              Ett styringspunkt for innsikt, prioritering, trygg leveranse og operatørinngrep. Flaten under er optimalisert for team som må balansere fart, etterprøvbarhet og offentlig tjenestekvalitet.
+            </div>
+          </div>
+          <div style={{ display: "grid", gap: 8, minWidth: 240 }}>
+            <StatusPill status={props.project?.enabled ? "active" : "paused"} />
+            <div style={{ padding: "14px 16px", borderRadius: 16, background: "#ffffff", border: "1px solid rgba(11,52,68,0.08)" }}>
+              <div style={{ fontSize: 12, color: "#115E59", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 800 }}>Nå-signal</div>
+              <div style={{ marginTop: 6, fontSize: 15, fontWeight: 700 }}>{strongestSignal}</div>
+              <div style={{ marginTop: 8, fontSize: 13, color: "rgba(11, 52, 68, 0.7)" }}>Tier: {tier} • Budsjett: {props.overview.budgetUsagePercent}% brukt</div>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+          {[
+            ["Aktive ideer", String(props.overview.activeIdeasCount)],
+            ["Godkjente tiltak", String(props.overview.approvedIdeasCount)],
+            ["Løp i arbeid", String(props.overview.runningRunsCount)],
+            ["Swipe i dag", String(props.overview.totalSwipesToday)],
+          ].map(([label, value]) => (
+            <div key={label} style={{ padding: "14px 16px", borderRadius: 16, background: "#ffffff", border: "1px solid rgba(11, 52, 68, 0.08)" }}>
+              <div style={{ fontSize: 12, color: "#115E59", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 800 }}>{label}</div>
+              <div style={{ marginTop: 8, fontSize: 28, fontWeight: 800, color: "#0B3444" }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function PreferenceSignalsCard(props: { companyId: string; projectId: string }) {
@@ -223,22 +330,23 @@ function PreferenceSignalsCard(props: { companyId: string; projectId: string }) 
 
 function StatsRow({ overview }: { overview: AutopilotOverview }) {
   const items = [
-    ["Ideas", String(overview.activeIdeasCount)],
-    ["Maybe", String(overview.maybePoolCount)],
-    ["Approved", String(overview.approvedIdeasCount)],
-    ["Runs", String(overview.runningRunsCount)],
-    ["Done", String(overview.completedRunsCount)],
-    ["Failed", String(overview.failedRunsCount)],
-    ["Swipes Today", String(overview.totalSwipesToday)],
-    ["Budget", `${overview.budgetUsagePercent}%`],
+    ["Aktive ideer", String(overview.activeIdeasCount), "Kandidater klare for videre vurdering"],
+    ["Kanskje-pool", String(overview.maybePoolCount), "Forslag som bør tas opp igjen senere"],
+    ["Godkjent", String(overview.approvedIdeasCount), "Tiltak klare for plan eller levering"],
+    ["Løp i arbeid", String(overview.runningRunsCount), "Pågående endringer under oppfølging"],
+    ["Fullført", String(overview.completedRunsCount), "Leveranser som er ferdig kjørt"],
+    ["Feilet", String(overview.failedRunsCount), "Løp som krever ekstra vurdering"],
+    ["Swipe i dag", String(overview.totalSwipesToday), "Operatøraktivitet siste døgn"],
+    ["Budsjettbruk", `${overview.budgetUsagePercent}%`, "Andel av tilgjengelig autopilot-budsjett"],
   ];
 
   return (
     <div style={GRID}>
-      {items.map(([label, value]) => (
-        <div key={label} style={CARD}>
-          <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a" }}>{value}</div>
-          <div style={MUTED}>{label}</div>
+      {items.map(([label, value, detail]) => (
+        <div key={label} style={METRIC_CARD}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</div>
+          <div style={{ marginTop: 8, fontSize: 28, fontWeight: 800, color: "#0f172a" }}>{value}</div>
+          <div style={{ ...MUTED, marginTop: 6 }}>{detail}</div>
         </div>
       ))}
     </div>
@@ -284,7 +392,11 @@ function ProjectSettingsCard(props: {
   }
 
   return (
-    <Section title="Project Settings" action={<StatusPill status={enabled ? "active" : "paused"} />}>
+    <Section
+      title="Prosjektoppsett"
+      subtitle="Styr automatiseringsnivå, budsjett og koblingen til den konkrete tjenesten. Endringene her setter rammene for hvordan autopiloten får arbeide."
+      action={<StatusPill status={enabled ? "active" : "paused"} />}
+    >
       <div style={{ display: "grid", gap: 12 }}>
         <div style={GRID}>
           <label style={{ display: "grid", gap: 6 }}>
@@ -368,7 +480,8 @@ function ResearchCard(props: { companyId: string; projectId: string; onRefresh: 
 
   return (
     <Section
-      title="Research and Ideation"
+      title="Innsikt og ideer"
+      subtitle="Start nye forskningssykluser og bruk dem til å fylle opp en prioriterbar idékø med tydelig begrunnelse."
       action={
         latestCycle ? <StatusPill status={latestCycle.status} /> : <span style={MUTED}>No research cycles yet</span>
       }
@@ -414,7 +527,10 @@ function IdeasCard(props: { companyId: string; projectId: string }) {
   });
 
   return (
-    <Section title="Idea Pool">
+    <Section
+      title="Tiltakskø"
+      subtitle="Forslagene under er de viktigste kandidatene akkurat nå. Hver idé viser kildegrunnlag, signalstyrke og hva modellen tror er verdt å gjøre."
+    >
       {!ideas || ideas.length === 0 ? (
         <EmptyState
           title="No ideas yet"
@@ -467,7 +583,10 @@ function RunsCard(props: { companyId: string; projectId: string }) {
   });
 
   return (
-    <Section title="Delivery Runs">
+    <Section
+      title="Leveringsløp"
+      subtitle="Her ser du aktive og nylige løp, inkludert feilklassifisering, arbeidsgren og hvor i prosessen inngrep eventuelt trengs."
+    >
       {!runs || runs.length === 0 ? (
         <EmptyState
           title="No delivery runs yet"
@@ -531,7 +650,8 @@ function BudgetControlCard(props: { companyId: string; onSaved: () => void }) {
 
   return (
     <Section
-      title="Budget Controls"
+      title="Budsjett og kapasitet"
+      subtitle="Hold autopilot innenfor trygge rammer. Dette er operativt budsjett, ikke bare en passiv statusindikator."
       action={<StatusPill status={budget?.paused ? "paused" : usagePercent >= 100 ? "failed" : "active"} />}
     >
       <div style={{ display: "grid", gap: 12 }}>
@@ -606,7 +726,10 @@ function DigestsCard(props: { companyId: string; projectId: string; onRefresh: (
   }
 
   return (
-    <Section title="Digest Inbox">
+    <Section
+      title="Operatørinnboks"
+      subtitle="Varsler med operativ betydning samles her. Bruk dem som prioriteringskø for inngrep, avklaringer og styringssignaler."
+    >
       {!digests || digests.length === 0 ? (
         <EmptyState
           title="No digests right now"
@@ -615,14 +738,14 @@ function DigestsCard(props: { companyId: string; projectId: string; onRefresh: (
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
           {digests.slice(0, 8).map((digest) => (
-            <div key={digest.digestId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+            <div key={digest.digestId} style={{ ...CARD, padding: 14, boxShadow: "none", borderLeft: `6px solid ${STATUS[digest.priority === "critical" ? "failed" : digest.priority === "high" ? "maybe" : "approved"] ?? "#64748b"}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
                 <div style={{ fontWeight: 700, color: "#0f172a" }}>{digest.title}</div>
                 <StatusPill status={digest.status} />
               </div>
               <div style={MUTED}>{digest.summary}</div>
               <div style={{ ...MUTED, marginTop: 6 }}>
-                Type {digest.digestType} | Priority {digest.priority}
+                Type {digest.digestType} | Prioritet {digest.priority}
               </div>
               {digest.urgency ? (
                 <div style={{ fontSize: 12, color: "#0f172a", marginTop: 6 }}>
@@ -680,7 +803,10 @@ function LearningCard(props: { companyId: string; projectId: string }) {
   });
 
   return (
-    <Section title="Learning Loop">
+    <Section
+      title="Læring og gjenbruk"
+      subtitle="Oppsummeringer og gjenbrukbar kunnskap skal gjøre neste levering tryggere, raskere og mer konsistent."
+    >
       <div style={{ display: "grid", gap: 12 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Recent Learner Summaries</div>
@@ -740,7 +866,10 @@ function EvaluationCard() {
   const qualityScorecard = getQualityScorecardSummary();
 
   return (
-    <Section title="Evaluation Scorecard">
+    <Section
+      title="Evalueringsscore"
+      subtitle="Målene under viser hvor troverdig rangering, digest-politikk og samlet kvalitet faktisk er over benchmark-scenarier."
+    >
       <div style={GRID}>
         <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
@@ -801,7 +930,10 @@ function AuditTimeline(props: {
   const events = buildRunAuditTimeline(props);
 
   return (
-    <Section title="Audit Timeline">
+    <Section
+      title="Revisjonsspor"
+      subtitle="Et fortløpende hendelsesbilde av kjøringen, inkludert helse, tilbakeføring og menneskelige inngrep."
+    >
       {events.length === 0 ? (
         <div style={MUTED}>No audit events yet.</div>
       ) : (
@@ -854,16 +986,23 @@ export function AutopilotProjectTab({ context }: PluginDetailTabProps) {
 
   return (
     <div style={PAGE}>
+      {overview ? <OverviewHero project={project ?? null} overview={overview} /> : null}
       {overview ? <StatsRow overview={overview} /> : <LoadingState label="overview" />}
-      <ProjectSettingsCard companyId={companyId} projectId={projectId} project={project} onSaved={refreshAll} />
-      <BudgetControlCard companyId={companyId} onSaved={refreshAll} />
-      <ResearchCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
-      <EvaluationCard />
-      <PreferenceSignalsCard companyId={companyId} projectId={projectId} />
-      <LearningCard companyId={companyId} projectId={projectId} />
-      <DigestsCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
-      <IdeasCard companyId={companyId} projectId={projectId} />
-      <RunsCard companyId={companyId} projectId={projectId} />
+      <div style={LAYOUT}>
+        <div style={{ display: "grid", gap: 18 }}>
+          <ProjectSettingsCard companyId={companyId} projectId={projectId} project={project} onSaved={refreshAll} />
+          <ResearchCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
+          <IdeasCard companyId={companyId} projectId={projectId} />
+          <RunsCard companyId={companyId} projectId={projectId} />
+        </div>
+        <div style={{ display: "grid", gap: 18 }}>
+          <BudgetControlCard companyId={companyId} onSaved={refreshAll} />
+          <DigestsCard companyId={companyId} projectId={projectId} onRefresh={refreshAll} />
+          <EvaluationCard />
+          <PreferenceSignalsCard companyId={companyId} projectId={projectId} />
+          <LearningCard companyId={companyId} projectId={projectId} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -877,8 +1016,24 @@ export function AutopilotSidebarLink({ context }: PluginProjectSidebarItemProps)
   if (!project) return null;
 
   return (
-    <div style={{ padding: "8px 12px", fontSize: 13, color: "#0f172a" }}>
-      <StatusPill status={project.enabled ? "active" : "paused"} /> Product Autopilot
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+        padding: "10px 12px",
+        borderRadius: 14,
+        background: "linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)",
+        border: "1px solid rgba(148, 163, 184, 0.22)",
+        boxShadow: "0 10px 22px rgba(15, 23, 42, 0.06)",
+      }}
+    >
+      <div style={{ display: "grid", gap: 3 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>Product Autopilot</div>
+        <div style={{ fontSize: 12, color: "#64748b" }}>{project.productType ?? "Digital tjeneste"}</div>
+      </div>
+      <StatusPill status={project.enabled ? "active" : "paused"} />
     </div>
   );
 }
@@ -911,20 +1066,26 @@ export function AutopilotProjectWidget({ context }: PluginWidgetProps) {
   }
 
   return (
-    <div style={{ ...CARD, display: "grid", gap: 8 }}>
-      <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Product Autopilot</div>
+    <div style={{ ...CARD, display: "grid", gap: 14, background: "linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
+        <div style={{ display: "grid", gap: 4 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>Product Autopilot</div>
+          <div style={MUTED}>Kompakt status for prosjektets operative helse.</div>
+        </div>
+        <StatusPill status={overview.failedRunsCount > 0 ? "failed" : overview.runningRunsCount > 0 ? "running" : "active"} />
+      </div>
       <div style={GRID}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>{overview.activeIdeasCount}</div>
-          <div style={MUTED}>Ideas</div>
+        <div style={METRIC_CARD}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em" }}>Ideer</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{overview.activeIdeasCount}</div>
         </div>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>{overview.runningRunsCount}</div>
-          <div style={MUTED}>Runs</div>
+        <div style={METRIC_CARD}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em" }}>Løp</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{overview.runningRunsCount}</div>
         </div>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>{overview.budgetUsagePercent}%</div>
-          <div style={MUTED}>Budget</div>
+        <div style={METRIC_CARD}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em" }}>Budsjett</div>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{overview.budgetUsagePercent}%</div>
         </div>
       </div>
     </div>
@@ -937,8 +1098,11 @@ export function AutopilotDashboardWidget({ context }: PluginWidgetProps) {
   });
 
   return (
-    <div style={{ ...CARD, display: "grid", gap: 10 }}>
-      <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Autopilot Dashboard</div>
+    <div style={{ ...CARD, display: "grid", gap: 12 }}>
+      <div style={{ display: "grid", gap: 4 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>Autopilot Dashboard</div>
+        <div style={MUTED}>Sammendrag på tvers av tjenester og team.</div>
+      </div>
       {!projects || projects.length === 0 ? (
         <EmptyState
           title="No autopilot-enabled projects yet"
@@ -946,8 +1110,11 @@ export function AutopilotDashboardWidget({ context }: PluginWidgetProps) {
         />
       ) : (
         projects.slice(0, 8).map((project) => (
-          <div key={project.autopilotId} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-            <span style={{ color: "#0f172a" }}>{project.projectId}</span>
+          <div key={project.autopilotId} style={{ ...METRIC_CARD, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+            <div style={{ display: "grid", gap: 4 }}>
+              <span style={{ color: "#0f172a", fontWeight: 700 }}>{project.projectId}</span>
+              <span style={{ fontSize: 12, color: "#64748b" }}>{project.productType ?? "Digital tjeneste"} • {project.automationTier}</span>
+            </div>
             <StatusPill status={project.enabled ? "active" : "paused"} />
           </div>
         ))
@@ -963,21 +1130,24 @@ export function AutopilotSettings({ context }: PluginSettingsPageProps) {
 
   return (
     <div style={PAGE}>
-      <Section title="Autopilot Settings">
+      <Section
+        title="Autopilot Settings"
+        subtitle="Oversikt over hvilke tjenester som er aktivert, hvilken styringsprofil de bruker, og hvor kapasiteten ligger akkurat nå."
+      >
         {!projects || projects.length === 0 ? (
           <EmptyState
             title="No configured projects yet"
             body="Once a project enables Product Autopilot, its configuration and policy settings will appear here."
           />
         ) : (
-          <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "grid", gap: 12 }}>
             {projects.map((project) => (
-              <div key={project.autopilotId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+              <div key={project.autopilotId} style={{ ...METRIC_CARD, padding: 16 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                  <div>
-                    <div style={{ fontWeight: 700, color: "#0f172a" }}>{project.projectId}</div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontWeight: 800, color: "#0f172a" }}>{project.projectId}</div>
                     <div style={MUTED}>
-                      Tier {project.automationTier} | Budget {project.budgetMinutes} minutes
+                      Tier {project.automationTier} • Budsjett {project.budgetMinutes} min • {project.productType ?? "Digital tjeneste"}
                     </div>
                   </div>
                   <StatusPill status={project.enabled ? "active" : "paused"} />
@@ -1136,7 +1306,8 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
   return (
     <div style={PAGE}>
       <Section
-        title="Run Summary"
+        title="Løpsstatus"
+        subtitle="Dette er den operative kommandopulten for kjøringen: status, risiko, inngrep og direkte kontroll over pause, checkpoint og avbryt."
         action={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <StatusPill status={activeRun.status} />
@@ -1159,6 +1330,22 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
         }
       >
         <div style={{ display: "grid", gap: 8 }}>
+          <div style={{ ...METRIC_CARD, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+            <div>
+              <div style={{ ...LABEL }}>Automatisering</div>
+              <div style={{ marginTop: 6, fontSize: 18, fontWeight: 800, color: "#0f172a" }}>{activeRun.automationTier}</div>
+            </div>
+            <div>
+              <div style={{ ...LABEL }}>Arbeidsgren</div>
+              <div style={{ marginTop: 6, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{activeRun.branchName}</div>
+            </div>
+            <div>
+              <div style={{ ...LABEL }}>Checkpoint</div>
+              <div style={{ marginTop: 6, fontSize: 15, fontWeight: 700, color: checkpointPolicy.satisfied ? "#0f766e" : "#b45309" }}>
+                {checkpointPolicy.required ? (checkpointPolicy.satisfied ? "Påkrevd og oppfylt" : "Påkrevd") : "Ikke påkrevd"}
+              </div>
+            </div>
+          </div>
           <div style={{ fontWeight: 700, color: "#0f172a" }}>{activeRun.title}</div>
           <div style={MUTED}>Branch: {activeRun.branchName}</div>
           <div style={MUTED}>Workspace: {activeRun.workspacePath}</div>
@@ -1191,7 +1378,10 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
           </div>
         </div>
       </Section>
-      <Section title="Release Health">
+      <Section
+        title="Release Health"
+        subtitle="Samlet helsebilde for testen, merge readiness og eventuelle blokkeringer før endringen kan gå videre."
+      >
         {!checks || checks.length === 0 ? (
           <EmptyState
             title="No release health checks yet"
@@ -1226,7 +1416,10 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
           </div>
         )}
       </Section>
-      <Section title="Operator Interventions">
+      <Section
+        title="Operator Interventions"
+        subtitle="Alle menneskelige inngrep logges her slik at kommunen kan etterprøve hvem som gjorde hva og hvorfor."
+      >
         {!interventions || interventions.length === 0 ? (
           <EmptyState
             title="No operator interventions recorded"
@@ -1246,7 +1439,10 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
           </div>
         )}
       </Section>
-      <Section title="Learning and Reuse">
+      <Section
+        title="Learning and Reuse"
+        subtitle="Hva lærte systemet av dette løpet, og hvilken kunnskap bør brukes igjen i neste leveranse?"
+      >
         {!summaries || summaries.filter((summary) => summary.runId === activeRun.runId).length === 0 ? (
           <EmptyState
             title="No learner summaries for this run"

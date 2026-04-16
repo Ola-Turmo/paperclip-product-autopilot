@@ -99,11 +99,11 @@ describe("ui smoke", () => {
       }),
     );
 
-    expect(html).toContain("Project Settings");
-    expect(html).toContain("Budget Controls");
-    expect(html).toContain("Research and Ideation");
-    expect(html).toContain("Digest Inbox");
-    expect(html).toContain("Evaluation Scorecard");
+    expect(html).toContain("Prosjektoppsett");
+    expect(html).toContain("Budsjett og kapasitet");
+    expect(html).toContain("Innsikt og ideer");
+    expect(html).toContain("Operatørinnboks");
+    expect(html).toContain("Evalueringsscore");
     expect(html).toContain("Preference Signals");
   });
 
@@ -175,12 +175,12 @@ describe("ui smoke", () => {
       }),
     );
 
-    expect(html).toContain("Run Summary");
+    expect(html).toContain("Løpsstatus");
     expect(html).toContain("Cancel");
     expect(html).toContain("Checkpoint policy");
     expect(html).toContain("Release Health");
     expect(html).toContain("Operator Interventions");
-    expect(html).toContain("Audit Timeline");
+    expect(html).toContain("Revisjonsspor");
   });
 
   it("renders digest urgency and recommended action", () => {
