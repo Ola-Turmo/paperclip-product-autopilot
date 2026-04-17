@@ -49,6 +49,10 @@ function createProfile(): PreferenceProfile {
       medium: { pass: 1, maybe: 1, yes: 1, now: 1 },
       high: { pass: 1, maybe: 0, yes: 0, now: 0 },
     },
+    executionModePreferences: {
+      simple: { pass: 0, maybe: 1, yes: 4, now: 2 },
+      convoy: { pass: 2, maybe: 0, yes: 0, now: 0 },
+    },
     avgApprovedScore: 76,
     avgRejectedScore: 41,
     lastUpdated: "2026-01-01T00:00:00.000Z",

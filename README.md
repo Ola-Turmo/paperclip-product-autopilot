@@ -195,6 +195,7 @@ src/
 
 docs/
   world-class-prd.md
+  schema-compatibility-policy.md
 ```
 
 ## Documentation

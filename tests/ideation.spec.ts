@@ -17,6 +17,11 @@ function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFindin
     description: "Users drop off before activation",
     sourceUrl: "https://example.com/source",
     sourceLabel: "support-summary",
+    sourceType: "support_ticket",
+    ingestedAt: "2026-01-01T00:05:00.000Z",
+    sourceDomain: "example.com",
+    sourceScope: "customer",
+    normalizedSourceKey: "support_ticket:example.com",
     category: "user_feedback",
     confidence: 0.9,
     signalFamily: "support",
@@ -49,6 +54,10 @@ function createProfile(): PreferenceProfile {
       medium: { pass: 0, maybe: 1, yes: 2, now: 1 },
       high: { pass: 1, maybe: 0, yes: 0, now: 0 },
     },
+    executionModePreferences: {
+      simple: { pass: 0, maybe: 1, yes: 3, now: 2 },
+      convoy: { pass: 1, maybe: 0, yes: 0, now: 0 },
+    },
     avgApprovedScore: 74,
     avgRejectedScore: 40,
     lastUpdated: "2026-01-01T00:00:00.000Z",
@@ -63,6 +72,7 @@ describe("ideation service", () => {
     expect(withProfile.impactScore).toBeGreaterThan(withoutProfile.impactScore);
     expect(withProfile.rankingScore).toBeGreaterThan(withoutProfile.rankingScore);
     expect(withProfile.explanation).toContain("preferenceBoost=");
+    expect(withProfile.rankingExplanation.executionModePreferenceBoost).toBeGreaterThanOrEqual(0);
   });
 
   it("ranks findings stably by score, confidence, then title", () => {
@@ -89,6 +99,7 @@ describe("ideation service", () => {
 
     expect(idea.title).toContain("Improve onboarding completion");
     expect(idea.rationale).toContain("confidence=0.90");
+    expect(idea.rankingExplanation?.provisionalExecutionMode).toBe("simple");
     expect(idea.sourceReferences).toEqual(["https://example.com/source"]);
     expect(idea.impactScore).toBeGreaterThan(70);
   });

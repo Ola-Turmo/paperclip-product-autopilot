@@ -79,6 +79,7 @@ const REGISTERED_ACTION_KEYS = [
   ACTION_KEYS.createReleaseHealthCheck,
   ACTION_KEYS.updateReleaseHealthStatus,
   ACTION_KEYS.triggerRollback,
+  ACTION_KEYS.updateRollbackStatus,
   ACTION_KEYS.addOperatorNote,
   ACTION_KEYS.requestCheckpoint,
   ACTION_KEYS.nudgeRun,

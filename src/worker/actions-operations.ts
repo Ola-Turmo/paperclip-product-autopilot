@@ -87,6 +87,10 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       projectId: string;
       runId: string;
       ideaId: string;
+      sourceRollbackId?: string;
+      sourceCheckId?: string;
+      sourceCheckpointId?: string;
+      sourceDigestId?: string;
       title: string;
       summaryText: string;
       keyLearnings?: string[];
@@ -99,6 +103,10 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       projectId: a.projectId,
       runId: a.runId,
       ideaId: a.ideaId,
+      sourceRollbackId: a.sourceRollbackId,
+      sourceCheckId: a.sourceCheckId,
+      sourceCheckpointId: a.sourceCheckpointId,
+      sourceDigestId: a.sourceDigestId,
       title: a.title,
       summaryText: a.summaryText,
       keyLearnings: a.keyLearnings ?? [],
@@ -121,6 +129,10 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       tags?: string[];
       sourceRunId?: string;
       sourceSummaryId?: string;
+      sourceRollbackId?: string;
+      sourceCheckId?: string;
+      sourceCheckpointId?: string;
+      sourceDigestId?: string;
     };
     const entry: KnowledgeEntry = {
       entryId: newId(),
@@ -132,6 +144,10 @@ export function registerOperationsActionHandlers(ctx: PluginContext) {
       reinjectionCommand: a.reinjectionCommand,
       sourceRunId: a.sourceRunId,
       sourceSummaryId: a.sourceSummaryId,
+      sourceRollbackId: a.sourceRollbackId,
+      sourceCheckId: a.sourceCheckId,
+      sourceCheckpointId: a.sourceCheckpointId,
+      sourceDigestId: a.sourceDigestId,
       usageCount: 0,
       tags: a.tags ?? [],
       createdAt: nowIso(),

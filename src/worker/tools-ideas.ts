@@ -196,7 +196,7 @@ export function registerIdeaToolHandlers(ctx: PluginContext) {
     }
 
     return {
-      content: `Generated ${created.length} ideas:\n${created.map((idea) => ` - ${idea.title} (impact: ${idea.impactScore}, feasibility: ${idea.feasibilityScore})`).join("\n")}`,
+      content: `Generated ${created.length} ideas:\n${created.map((idea) => ` - ${idea.title} (impact: ${idea.impactScore}, feasibility: ${idea.feasibilityScore}, ranking: ${idea.rankingExplanation?.rankingScore ?? "n/a"}, execution mode: ${idea.rankingExplanation?.provisionalExecutionMode ?? "n/a"})`).join("\n")}`,
     };
   });
 }

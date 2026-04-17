@@ -9,6 +9,7 @@ import type {
 } from "../src/types.js";
 import {
   validateConvoyDependencies,
+  validateDeliveryRunCancellation,
   validateDeliveryRunCreation,
   validatePlanningArtifactInvariant,
   validateRollbackRequest,
@@ -30,6 +31,10 @@ function createPlanningArtifact(overrides: Partial<PlanningArtifact> = {}): Plan
     executionMode: "simple",
     approvalMode: "manual",
     automationTier: "semiauto",
+    riskLevel: "medium",
+    riskFactors: ["delivery_dependencies"],
+    rolloutGuardrails: ["Run smoke tests before marking the run complete"],
+    cancellationPolicy: "operator_cancel",
     status: "draft",
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
@@ -125,6 +130,15 @@ describe("invariant services", () => {
       ),
     ).toThrow("checkpointReason");
 
+    expect(() =>
+      validatePlanningArtifactInvariant(
+        createPlanningArtifact({
+          riskLevel: "high",
+          checkpointRequired: false,
+        }),
+      ),
+    ).toThrow("High-risk plans");
+
     const activeLock: ProductLock = {
       lockId: "lock-1",
       companyId: "company-1",
@@ -190,5 +204,26 @@ describe("invariant services", () => {
         dependencies: [["1"], ["0"]],
       }),
     ).toThrow("cannot contain cycles");
+  });
+
+  it("enforces explicit cancellation semantics for checkpointed runs", () => {
+    expect(() =>
+      validateDeliveryRunCancellation({
+        run: createRun(),
+        artifact: { cancellationPolicy: "checkpoint_or_acknowledged_force" },
+        checkpoints: [],
+        reason: "Stop the run",
+      }),
+    ).toThrow("checkpoint before cancellation");
+
+    expect(() =>
+      validateDeliveryRunCancellation({
+        run: createRun(),
+        artifact: { cancellationPolicy: "checkpoint_or_acknowledged_force" },
+        checkpoints: [],
+        reason: "Emergency stop",
+        force: true,
+      }),
+    ).not.toThrow();
   });
 });

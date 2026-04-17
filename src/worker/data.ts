@@ -139,13 +139,21 @@ export function registerDataHandlers(ctx: PluginContext) {
   });
 
   ctx.data.register(DATA_KEYS.learnerSummaries, async (args) => {
-    const { companyId, projectId } = args as { companyId: string; projectId: string };
-    return await repo.listLearnerSummaries(companyId, projectId);
+    const { companyId, projectId, runId } = args as { companyId: string; projectId: string; runId?: string };
+    return await repo.listLearnerSummaries(companyId, projectId, runId);
   });
 
   ctx.data.register(DATA_KEYS.knowledgeEntries, async (args) => {
-    const { companyId, projectId } = args as { companyId: string; projectId: string };
-    return await repo.listKnowledgeEntries(companyId, projectId);
+    const { companyId, projectId, sourceRunId, sourceSummaryId } = args as {
+      companyId: string;
+      projectId: string;
+      sourceRunId?: string;
+      sourceSummaryId?: string;
+    };
+    return await repo.listKnowledgeEntries(companyId, projectId, {
+      sourceRunId,
+      sourceSummaryId,
+    });
   });
 
   ctx.data.register(DATA_KEYS.digests, async (args) => {

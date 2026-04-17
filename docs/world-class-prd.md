@@ -467,7 +467,7 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [ ] Audit entity keys, scope rules, and lookup patterns for consistency.
 - [ ] Add repository tests that assert entity persistence shape and lookup semantics.
 - [ ] Reduce duplicate entity-query patterns by consolidating common repository methods.
-- [ ] Add migration notes or compatibility policy for future schema changes.
+- [x] Add migration notes or compatibility policy for future schema changes.
 
 ### 16.4 Research intelligence
 
@@ -551,8 +551,8 @@ This is the authoritative backlog. Keep this list current. Do not create separat
 - [x] Add transition-matrix tests for state machines.
 - [x] Add repository contract tests.
 - [~] Add UI smoke tests.
-- [ ] Add more worker integration tests around rollback, checkpoint restore, release-health aggregation, and digest escalation.
-- [ ] Add fixture-driven tests for ranking and duplicate detection.
+- [~] Add more worker integration tests around rollback, checkpoint restore, release-health aggregation, and digest escalation.
+- [~] Add fixture-driven tests for ranking and duplicate detection.
 - [x] Add package-install validation in CI from a clean environment.
 - [~] Add failure-path tests, not just happy-path tests.
 

@@ -9,6 +9,15 @@ const DIGEST_COOLDOWN_HOURS: Partial<Record<Digest["digestType"], number>> = {
   weekly_summary: 24,
 };
 
+const DIGEST_RECURRENCE_WINDOW_HOURS: Partial<Record<Digest["digestType"], number>> = {
+  budget_alert: 48,
+  stuck_run: 24,
+  health_check_failed: 48,
+  opportunity: 72,
+  idea_resurface: 168,
+  weekly_summary: 168,
+};
+
 const PRIORITY_WEIGHT: Record<Digest["priority"], number> = {
   low: 1,
   medium: 2,
@@ -18,21 +27,39 @@ const PRIORITY_WEIGHT: Record<Digest["priority"], number> = {
 
 const PRIORITIES: Digest["priority"][] = ["low", "medium", "high", "critical"];
 
+function getUrgencyWeight(urgency: NonNullable<Digest["urgency"]>): number {
+  switch (urgency) {
+    case "informational":
+      return 1;
+    case "attention":
+      return 2;
+    case "blocking":
+      return 3;
+    case "intervention_required":
+      return 4;
+    default:
+      return 0;
+  }
+}
+
 export function deriveDigestUrgency(input: {
   digestType: Digest["digestType"];
   priority: Digest["priority"];
   escalationLevel?: number;
 }): NonNullable<Digest["urgency"]> {
+  const escalationLevel = input.escalationLevel ?? 0;
   if (input.digestType === "stuck_run") {
-    if ((input.escalationLevel ?? 0) >= 2 || input.priority === "critical") return "intervention_required";
+    if (escalationLevel >= 2 || input.priority === "critical") return "intervention_required";
     return "blocking";
   }
   if (input.digestType === "budget_alert") {
+    if (escalationLevel >= 2) return "intervention_required";
     if (input.priority === "critical") return "blocking";
     return "attention";
   }
   if (input.digestType === "health_check_failed") {
-    return input.priority === "critical" ? "intervention_required" : "blocking";
+    if (escalationLevel >= 1 || input.priority === "critical") return "intervention_required";
+    return "blocking";
   }
   if (input.priority === "critical") return "intervention_required";
   if (input.priority === "high") return "attention";
@@ -49,12 +76,16 @@ export function deriveDigestRecommendedAction(input: {
       : "Review the stuck run and decide whether to nudge, checkpoint, or pause it.";
   }
   if (input.digestType === "budget_alert") {
-    return input.urgency === "blocking"
+    return input.urgency === "intervention_required"
+      ? "Escalate budget ownership immediately, pause new automation, and capture an operator decision before resuming."
+      : input.urgency === "blocking"
       ? "Adjust the budget or pause further autonomous execution before more work starts."
       : "Review budget burn and decide whether to expand or constrain autopilot time.";
   }
   if (input.digestType === "health_check_failed") {
-    return "Inspect the failed health check and decide whether rollback or operator intervention is required.";
+    return input.urgency === "intervention_required"
+      ? "Inspect the failed health check immediately, decide on rollback, and record the operator intervention."
+      : "Inspect the failed health check and decide whether rollback or operator intervention is required.";
   }
   return "Review the digest and decide whether operator action is required.";
 }
@@ -112,6 +143,74 @@ function getEscalationLevel(reopenCount: number): number {
   return 0;
 }
 
+function getRecurrenceEscalationLevel(
+  digestType: Digest["digestType"],
+  recentOccurrenceCount: number,
+): number {
+  if (recentOccurrenceCount <= 1) return 0;
+  if (digestType === "health_check_failed") {
+    if (recentOccurrenceCount >= 3) return 2;
+    return 1;
+  }
+  if (digestType === "stuck_run") {
+    if (recentOccurrenceCount >= 3) return 2;
+    return 1;
+  }
+  if (digestType === "budget_alert") {
+    if (recentOccurrenceCount >= 3) return 2;
+    if (recentOccurrenceCount >= 2) return 1;
+    return 0;
+  }
+  if (recentOccurrenceCount >= 4) return 1;
+  return 0;
+}
+
+function countRecentOccurrences(
+  digests: Digest[],
+  candidate: Digest,
+  dedupeKey: string,
+  now: string,
+): number {
+  const windowHours = DIGEST_RECURRENCE_WINDOW_HOURS[candidate.digestType] ?? 24;
+  const windowStart = new Date(now).getTime() - windowHours * 60 * 60 * 1000;
+  return digests.filter((digest) => {
+    if (getEffectiveDedupeKey(digest) !== dedupeKey) return false;
+    if (digest.status === "pending") return false;
+    const createdAt = new Date(digest.createdAt).getTime();
+    return Number.isFinite(createdAt) && createdAt >= windowStart;
+  }).length;
+}
+
+function withEscalationMetadata(
+  candidate: Digest,
+  escalationLevel: number,
+  recentOccurrenceCount: number,
+): Digest {
+  const priority = escalateDigestPriority(candidate.priority, escalationLevel);
+  const urgency = deriveDigestUrgency({
+    digestType: candidate.digestType,
+    priority,
+    escalationLevel,
+  });
+  const recurrenceDetail =
+    recentOccurrenceCount > 1
+      ? `Recurring alert (${recentOccurrenceCount} occurrences in recent window)`
+      : null;
+  return {
+    ...candidate,
+    escalationLevel,
+    priority,
+    urgency,
+    recommendedAction: deriveDigestRecommendedAction({
+      digestType: candidate.digestType,
+      urgency,
+    }),
+    details: recurrenceDetail && !candidate.details.includes(recurrenceDetail)
+      ? [recurrenceDetail, ...candidate.details]
+      : candidate.details,
+  };
+}
+
 export function evaluateDigestCreationPolicy(
   existingDigests: Digest[],
   candidate: Digest,
@@ -125,10 +224,30 @@ export function evaluateDigestCreationPolicy(
   const sameKeyDigests = existingDigests
     .filter((existing) => getEffectiveDedupeKey(existing) === dedupeKey)
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  const recentOccurrenceCount = countRecentOccurrences(existingDigests, candidate, dedupeKey, now) + 1;
+  const baseEscalationLevel = Math.max(
+    candidate.escalationLevel ?? 0,
+    getRecurrenceEscalationLevel(candidate.digestType, recentOccurrenceCount),
+  );
+  const candidateWithRecurrence = withEscalationMetadata({
+    ...candidate,
+    dedupeKey,
+    reopenCount: candidate.reopenCount ?? 0,
+  }, baseEscalationLevel, recentOccurrenceCount);
 
   const activeDuplicate = sameKeyDigests.find((existing) => {
     if (existing.status === "dismissed") return false;
-    return PRIORITY_WEIGHT[existing.priority] >= PRIORITY_WEIGHT[candidate.priority];
+    const existingEscalationLevel = existing.escalationLevel ?? 0;
+    const existingUrgency = deriveDigestUrgency({
+      digestType: existing.digestType,
+      priority: existing.priority,
+      escalationLevel: existingEscalationLevel,
+    });
+    return (
+      PRIORITY_WEIGHT[existing.priority] >= PRIORITY_WEIGHT[candidateWithRecurrence.priority] &&
+      existingEscalationLevel >= (candidateWithRecurrence.escalationLevel ?? 0) &&
+      getUrgencyWeight(existingUrgency) >= getUrgencyWeight(candidateWithRecurrence.urgency ?? "informational")
+    );
   });
   if (activeDuplicate) {
     return {
@@ -157,50 +276,21 @@ export function evaluateDigestCreationPolicy(
         const escalationLevel = Math.max(
           dismissedDigest.escalationLevel ?? 0,
           getEscalationLevel(reopenCount),
+          getRecurrenceEscalationLevel(candidate.digestType, recentOccurrenceCount),
         );
-        return {
+        return withEscalationMetadata({
           ...candidate,
           dedupeKey,
           reopenCount,
-          escalationLevel,
-          priority: escalateDigestPriority(candidate.priority, escalationLevel),
-          urgency: deriveDigestUrgency({
-            digestType: candidate.digestType,
-            priority: escalateDigestPriority(candidate.priority, escalationLevel),
-            escalationLevel,
-          }),
-          recommendedAction: deriveDigestRecommendedAction({
-            digestType: candidate.digestType,
-            urgency: deriveDigestUrgency({
-              digestType: candidate.digestType,
-              priority: escalateDigestPriority(candidate.priority, escalationLevel),
-              escalationLevel,
-            }),
-          }),
-        };
+        }, escalationLevel, recentOccurrenceCount);
       })(),
     };
   }
 
-  const urgency = deriveDigestUrgency({
-    digestType: candidate.digestType,
-    priority: candidate.priority,
-    escalationLevel: candidate.escalationLevel ?? 0,
-  });
   return {
     shouldCreate: true,
     reason: "create",
-    candidate: {
-      ...candidate,
-      dedupeKey,
-      reopenCount: candidate.reopenCount ?? 0,
-      escalationLevel: candidate.escalationLevel ?? 0,
-      urgency,
-      recommendedAction: candidate.recommendedAction ?? deriveDigestRecommendedAction({
-        digestType: candidate.digestType,
-        urgency,
-      }),
-    },
+    candidate: candidateWithRecurrence,
   };
 }
 

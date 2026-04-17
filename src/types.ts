@@ -70,6 +70,9 @@ export interface ResearchCycle {
     findingIds: string[];
     topicCounts: Record<string, number>;
     signalFamilyCounts: Record<string, number>;
+    sourceTypeCounts: Record<string, number>;
+    sourceScopeCounts: Record<string, number>;
+    sourceDomainCounts: Record<string, number>;
     averageFreshnessScore: number;
     averageSourceQualityScore: number;
     duplicateCount: number;
@@ -101,6 +104,9 @@ export interface ResearchFinding {
   sourceId?: string;
   sourceTimestamp?: string;
   ingestedAt?: string;
+  sourceDomain?: string;
+  sourceScope?: "internal" | "customer" | "external";
+  normalizedSourceKey?: string;
   evidenceText?: string;
   signalFamily?: "support" | "analytics" | "market" | "incident" | "qualitative" | "technical";
   topic?: string;
@@ -135,6 +141,7 @@ export interface Idea {
   complexityEstimate?: "low" | "medium" | "high";
   technicalApproach?: string;
   risks?: string[];
+  rankingExplanation?: IdeaRankingExplanation;
   category?: string;
   tags?: string[];
   status: IdeaStatus;
@@ -168,9 +175,28 @@ export interface PreferenceProfile {
   categoryPreferences: Record<string, { pass: number; maybe: number; yes: number; now: number }>;
   tagPreferences: Record<string, { pass: number; maybe: number; yes: number; now: number }>;
   complexityPreferences: Record<string, { pass: number; maybe: number; yes: number; now: number }>;
+  executionModePreferences: Record<string, { pass: number; maybe: number; yes: number; now: number }>;
   avgApprovedScore: number;
   avgRejectedScore: number;
   lastUpdated: string;
+}
+
+export interface IdeaRankingExplanation {
+  rankingScore: number;
+  impactScore: number;
+  feasibilityScore: number;
+  category?: string;
+  confidence: number;
+  freshnessScore: number;
+  sourceQualityScore: number;
+  complexityEstimate: "low" | "medium" | "high";
+  provisionalExecutionMode: ExecutionMode;
+  preferenceBoost: number;
+  complexityPreferenceBoost: number;
+  executionModePreferenceBoost: number;
+  researchQualityBoost: number;
+  outcomeBoost: number;
+  outcomeEvidenceCount: number;
 }
 
 // ─── PlanningArtifact ─────────────────────────────────────────────────────────
@@ -190,6 +216,10 @@ export interface PlanningArtifact {
   approvalMode: ApprovalMode;
   checkpointRequired: boolean;
   checkpointReason?: string;
+  riskLevel?: "low" | "medium" | "high";
+  riskFactors?: string[];
+  rolloutGuardrails?: string[];
+  cancellationPolicy?: "operator_cancel" | "checkpoint_or_acknowledged_force";
   automationTier: AutomationTier;
   status: "draft" | "approved" | "in_progress" | "completed" | "cancelled";
   createdAt: string;
@@ -324,6 +354,10 @@ export interface LearnerSummary {
   projectId: string;
   runId: string;
   ideaId: string;
+  sourceRollbackId?: string;
+  sourceCheckId?: string;
+  sourceCheckpointId?: string;
+  sourceDigestId?: string;
   title: string;
   summaryText: string;
   keyLearnings: string[];
@@ -349,6 +383,10 @@ export interface KnowledgeEntry {
   reinjectionCommand?: string;
   sourceRunId?: string;
   sourceSummaryId?: string;
+  sourceRollbackId?: string;
+  sourceCheckId?: string;
+  sourceCheckpointId?: string;
+  sourceDigestId?: string;
   usedInRunId?: string;
   lastUsedAt?: string;
   usageCount: number;

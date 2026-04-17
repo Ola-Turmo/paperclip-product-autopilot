@@ -12,6 +12,11 @@ function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFindin
     description: "Users drop before activation",
     sourceUrl: "https://support.example.com/tickets/123",
     sourceLabel: "support-ticket",
+    sourceType: "support_ticket",
+    ingestedAt: "2026-04-14T00:05:00.000Z",
+    sourceDomain: "support.example.com",
+    sourceScope: "customer",
+    normalizedSourceKey: "support_ticket:support.example.com",
     category: "user_feedback",
     confidence: 0.92,
     signalFamily: "support",
@@ -33,6 +38,9 @@ describe("research cycle snapshot", () => {
         findingId: "finding-2",
         topic: "signup-friction",
         signalFamily: "analytics",
+        sourceType: "analytics_report",
+        sourceScope: "internal",
+        sourceDomain: "analytics.example.com",
         sourceQualityScore: 70,
         freshnessScore: 80,
         duplicateAnnotated: true,
@@ -44,6 +52,11 @@ describe("research cycle snapshot", () => {
     expect(snapshot.topicCounts["onboarding-completion"]).toBe(1);
     expect(snapshot.signalFamilyCounts.support).toBe(1);
     expect(snapshot.signalFamilyCounts.analytics).toBe(1);
+    expect(snapshot.sourceTypeCounts.support_ticket).toBe(1);
+    expect(snapshot.sourceTypeCounts.analytics_report).toBe(1);
+    expect(snapshot.sourceScopeCounts.customer).toBe(1);
+    expect(snapshot.sourceScopeCounts.internal).toBe(1);
+    expect(snapshot.sourceDomainCounts["support.example.com"]).toBe(1);
     expect(snapshot.duplicateCount).toBe(1);
     expect(snapshot.averageFreshnessScore).toBeGreaterThan(80);
   });

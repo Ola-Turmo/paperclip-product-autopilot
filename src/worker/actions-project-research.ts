@@ -201,6 +201,7 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       sourceType?: ResearchFinding["sourceType"];
       sourceId?: string;
       sourceTimestamp?: string;
+      ingestedAt?: string;
       evidenceText?: string;
       category?: ResearchFinding["category"];
     };
@@ -217,6 +218,7 @@ export function registerProjectResearchActionHandlers(ctx: PluginContext) {
       sourceType: a.sourceType,
       sourceId: a.sourceId,
       sourceTimestamp: a.sourceTimestamp,
+      ingestedAt: a.ingestedAt,
       evidenceText: a.evidenceText,
       category: a.category,
       createdAt: nowIso(),

@@ -19,6 +19,7 @@ function createProfile(): PreferenceProfile {
     categoryPreferences: {},
     tagPreferences: {},
     complexityPreferences: {},
+    executionModePreferences: {},
     avgApprovedScore: 0,
     avgRejectedScore: 0,
     lastUpdated: "2026-01-01T00:00:00.000Z",
@@ -74,6 +75,7 @@ describe("applySwipeToPreferenceProfile", () => {
     expect(updated.tagPreferences.activation?.yes).toBe(1);
     expect(updated.tagPreferences.ux?.yes).toBe(1);
     expect(updated.complexityPreferences.medium?.yes).toBe(1);
+    expect(updated.executionModePreferences.simple?.yes).toBe(1);
   });
 
   it("tracks immediate-priority swipes separately", () => {

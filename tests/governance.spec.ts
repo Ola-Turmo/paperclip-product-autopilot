@@ -49,6 +49,24 @@ describe("governance policy", () => {
     ).not.toThrow();
   });
 
+  it("requires operator acknowledgment and note for revert-commit rollback", () => {
+    expect(() =>
+      requireGovernancePolicy({
+        action: "revert_commit_rollback",
+        governanceNote: "",
+        operatorAcknowledged: false,
+      }),
+    ).toThrow("operator acknowledgment");
+
+    expect(() =>
+      requireGovernancePolicy({
+        action: "revert_commit_rollback",
+        governanceNote: "Reverting the latest commit to restore service",
+        operatorAcknowledged: true,
+      }),
+    ).not.toThrow();
+  });
+
   it("requires a governance note for merge locks", () => {
     expect(() =>
       requireGovernancePolicy({
@@ -56,5 +74,41 @@ describe("governance policy", () => {
         governanceNote: "",
       }),
     ).toThrow("governance note");
+  });
+
+  it("requires acknowledgment and a note for releasing merge locks", () => {
+    expect(() =>
+      requireGovernancePolicy({
+        action: "release_merge_lock",
+        governanceNote: "",
+        operatorAcknowledged: false,
+      }),
+    ).toThrow("operator acknowledgment");
+
+    expect(() =>
+      requireGovernancePolicy({
+        action: "release_merge_lock",
+        governanceNote: "Conditions satisfied, removing the gate",
+        operatorAcknowledged: true,
+      }),
+    ).not.toThrow();
+  });
+
+  it("requires acknowledgment and a note for force-cancel", () => {
+    expect(() =>
+      requireGovernancePolicy({
+        action: "force_cancel_run",
+        governanceNote: "",
+        operatorAcknowledged: false,
+      }),
+    ).toThrow("operator acknowledgment");
+
+    expect(() =>
+      requireGovernancePolicy({
+        action: "force_cancel_run",
+        governanceNote: "Checkpoint unavailable and operator is halting the run",
+        operatorAcknowledged: true,
+      }),
+    ).not.toThrow();
   });
 });

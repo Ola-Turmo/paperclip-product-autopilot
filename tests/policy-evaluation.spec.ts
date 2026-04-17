@@ -62,6 +62,12 @@ describe("digest policy", () => {
         urgency: stuckUrgency,
       }),
     ).toContain("Inspect the run immediately");
+    expect(
+      deriveDigestRecommendedAction({
+        digestType: "health_check_failed",
+        urgency: "intervention_required",
+      }),
+    ).toContain("immediately");
   });
 
   it("suppresses dismissed digests during cooldown and reopens after cooldown", () => {
@@ -129,6 +135,101 @@ describe("digest policy", () => {
     expect(reopened.candidate.reopenCount).toBe(3);
     expect(reopened.candidate.escalationLevel).toBe(2);
     expect(reopened.candidate.priority).toBe("critical");
+  });
+
+  it("escalates recurring health-check failures without requiring a dismissal cycle", () => {
+    const recurring = evaluateDigestCreationPolicy(
+      [
+        createDigest({
+          digestId: "existing-health-1",
+          digestType: "health_check_failed",
+          relatedRunId: "run-1",
+          title: "Health check failed: Smoke",
+          summary: "smoke_test failed for run Delivery",
+          priority: "high",
+          urgency: "blocking",
+          createdAt: "2026-01-01T01:00:00.000Z",
+        }),
+        createDigest({
+          digestId: "existing-health-2",
+          digestType: "health_check_failed",
+          relatedRunId: "run-1",
+          title: "Health check failed: Smoke",
+          summary: "smoke_test failed for run Delivery",
+          priority: "high",
+          status: "dismissed",
+          dismissedAt: "2026-01-01T01:10:00.000Z",
+          createdAt: "2026-01-01T01:00:00.000Z",
+        }),
+      ],
+      createDigest({
+        digestId: "candidate-health",
+        digestType: "health_check_failed",
+        relatedRunId: "run-1",
+        title: "Health check failed: Smoke",
+        summary: "smoke_test failed for run Delivery",
+        priority: "high",
+        createdAt: "2026-01-02T04:00:00.000Z",
+      }),
+      "2026-01-02T04:00:00.000Z",
+    );
+
+    expect(recurring.shouldCreate).toBe(true);
+    expect(recurring.candidate.escalationLevel).toBeGreaterThan(0);
+    expect(recurring.candidate.urgency).toBe("intervention_required");
+    expect(recurring.candidate.details[0]).toContain("Recurring alert");
+  });
+
+  it("escalates recurring budget alerts after multiple occurrences", () => {
+    const recurring = evaluateDigestCreationPolicy(
+      [
+        createDigest({
+          digestId: "budget-1",
+          digestType: "budget_alert",
+          relatedBudgetId: "budget-1",
+          title: "Autopilot budget at 92%",
+          summary: "Autopilot has used 110/120 minutes",
+          priority: "high",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        }),
+        createDigest({
+          digestId: "budget-2",
+          digestType: "budget_alert",
+          relatedBudgetId: "budget-1",
+          title: "Autopilot budget at 95%",
+          summary: "Autopilot has used 114/120 minutes",
+          priority: "critical",
+          status: "dismissed",
+          dismissedAt: "2026-01-01T06:00:00.000Z",
+          createdAt: "2026-01-01T06:00:00.000Z",
+        }),
+        createDigest({
+          digestId: "budget-3",
+          digestType: "budget_alert",
+          relatedBudgetId: "budget-1",
+          title: "Autopilot budget at 98%",
+          summary: "Autopilot has used 118/120 minutes",
+          priority: "critical",
+          status: "dismissed",
+          dismissedAt: "2026-01-01T12:00:00.000Z",
+          createdAt: "2026-01-01T12:00:00.000Z",
+        }),
+      ],
+      createDigest({
+        digestId: "budget-4",
+        digestType: "budget_alert",
+        relatedBudgetId: "budget-1",
+        title: "Autopilot budget at 100%",
+        summary: "Autopilot has used 120/120 minutes",
+        priority: "critical",
+        createdAt: "2026-01-02T00:00:00.000Z",
+      }),
+      "2026-01-02T00:00:00.000Z",
+    );
+
+    expect(recurring.shouldCreate).toBe(true);
+    expect(recurring.candidate.escalationLevel).toBeGreaterThan(0);
+    expect(recurring.candidate.urgency).toBe("intervention_required");
   });
 
   it("evaluates digest policy replay accuracy", () => {

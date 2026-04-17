@@ -1,4 +1,4 @@
-import type { AutopilotProject, CompanyBudget, DeliveryRun, Digest } from "../types.js";
+import type { AutopilotProject, CompanyBudget, DeliveryRun, Digest, ReleaseHealthCheck } from "../types.js";
 import { buildDigestDedupeKey, deriveDigestRecommendedAction, deriveDigestUrgency } from "./digest-policy.js";
 
 export function shouldPauseForBudget(
@@ -97,6 +97,68 @@ export function createStuckRunDigest(input: {
     dismissedAt: null,
     reopenCount: 0,
     relatedRunId: input.stuckRuns[0]?.runId,
+    createdAt: input.createdAt,
+  };
+}
+
+function deriveHealthCheckFailurePriority(
+  check: Pick<ReleaseHealthCheck, "checkType">,
+): Digest["priority"] {
+  switch (check.checkType) {
+    case "merge_check":
+      return "critical";
+    case "integration_test":
+    case "smoke_test":
+      return "high";
+    default:
+      return "medium";
+  }
+}
+
+export function createHealthCheckFailedDigest(input: {
+  digestId: string;
+  companyId: string;
+  projectId: string;
+  run: Pick<DeliveryRun, "runId" | "title" | "status">;
+  check: Pick<ReleaseHealthCheck, "checkId" | "checkType" | "name" | "errorMessage">;
+  createdAt: string;
+}): Digest {
+  const priority = deriveHealthCheckFailurePriority(input.check);
+  const urgency = deriveDigestUrgency({
+    digestType: "health_check_failed",
+    priority,
+    escalationLevel: 0,
+  });
+  return {
+    digestId: input.digestId,
+    companyId: input.companyId,
+    projectId: input.projectId,
+    digestType: "health_check_failed",
+    dedupeKey: buildDigestDedupeKey({
+      digestType: "health_check_failed",
+      relatedRunId: input.run.runId,
+      title: input.check.name,
+      summary: input.check.errorMessage ?? input.check.checkType,
+    }),
+    title: `Health check failed: ${input.check.name}`,
+    summary: `${input.check.checkType} failed for run ${input.run.title}`,
+    details: [
+      `Run status: ${input.run.status}`,
+      ...(input.check.errorMessage ? [input.check.errorMessage] : []),
+    ],
+    priority,
+    escalationLevel: 0,
+    urgency,
+    recommendedAction: deriveDigestRecommendedAction({
+      digestType: "health_check_failed",
+      urgency,
+    }),
+    status: "pending",
+    deliveredAt: null,
+    readAt: null,
+    dismissedAt: null,
+    reopenCount: 0,
+    relatedRunId: input.run.runId,
     createdAt: input.createdAt,
   };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyRollbackOutcomeToRun,
   buildCheckpoint,
   buildReleaseHealthCheck,
   buildRestoredConvoyTask,
@@ -7,7 +8,9 @@ import {
   canTriggerRollback,
   checkpointSummary,
   describeCheckpointPolicy,
+  summarizeRunRemediationState,
   summarizeReleaseHealthChecks,
+  updateRollbackAction,
   validateCheckpointRestore,
   updateReleaseHealthCheck,
 } from "../src/services/lifecycle.js";
@@ -178,6 +181,103 @@ describe("lifecycle services", () => {
       "failed",
       "2026-01-03T00:00:00.000Z",
     ))).toBe(true);
+  });
+
+  it("updates rollback actions and applies rollback outcomes to the run", () => {
+    const rollback = updateRollbackAction(
+      buildRollbackAction({
+        rollbackId: "rollback-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-1",
+        checkId: "check-1",
+        rollbackType: "restore_checkpoint",
+        checkpointId: "checkpoint-1",
+        createdAt: "2026-01-03T00:00:00.000Z",
+      }),
+      "completed",
+      "2026-01-03T00:10:00.000Z",
+    );
+    const pausedRun = applyRollbackOutcomeToRun({
+      run: createRun(),
+      rollback,
+      updatedAt: "2026-01-03T00:10:00.000Z",
+    });
+    const failedRun = applyRollbackOutcomeToRun({
+      run: createRun(),
+      rollback: { ...rollback, status: "failed", rollbackType: "revert_commit" },
+      updatedAt: "2026-01-03T00:20:00.000Z",
+      errorMessage: "Revert failed",
+    });
+
+    expect(rollback.status).toBe("completed");
+    expect(rollback.completedAt).toBe("2026-01-03T00:10:00.000Z");
+    expect(pausedRun.status).toBe("paused");
+    expect(pausedRun.pauseReason).toContain("Rollback completed");
+    expect(failedRun.status).toBe("failed");
+    expect(failedRun.error).toBe("Revert failed");
+  });
+
+  it("summarizes remediation state for failed and recovered runs", () => {
+    const checkpoint = buildCheckpoint({
+      checkpointId: "checkpoint-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: "run-1",
+      run: createRun(),
+      tasks: [createTask()],
+      createdAt: "2026-01-03T00:00:00.000Z",
+      label: "Before risky deploy",
+    });
+    const failedCheck = updateReleaseHealthCheck(
+      buildReleaseHealthCheck({
+        checkId: "check-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-1",
+        checkType: "smoke_test",
+        name: "Smoke test",
+        createdAt: "2026-01-03T00:05:00.000Z",
+      }),
+      "failed",
+      "2026-01-03T00:07:00.000Z",
+      "Homepage 500",
+    );
+    const completedRollback = updateRollbackAction(
+      buildRollbackAction({
+        rollbackId: "rollback-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-1",
+        checkId: "check-1",
+        rollbackType: "restore_checkpoint",
+        checkpointId: "checkpoint-1",
+        createdAt: "2026-01-03T00:08:00.000Z",
+      }),
+      "completed",
+      "2026-01-03T00:12:00.000Z",
+    );
+
+    const recoveredSummary = summarizeRunRemediationState({
+      run: { ...createRun(), status: "paused", pauseReason: "Rollback completed: restore_checkpoint" },
+      checks: [failedCheck],
+      rollbacks: [completedRollback],
+      checkpoints: [checkpoint],
+    });
+    const blockedSummary = summarizeRunRemediationState({
+      run: createRun(),
+      checks: [failedCheck],
+      rollbacks: [],
+      checkpoints: [],
+    });
+
+    expect(recoveredSummary.status).toBe("recovered");
+    expect(recoveredSummary.headline).toContain("Rollback completed");
+    expect(recoveredSummary.recoveryTimeLabel).toBe("5m");
+    expect(recoveredSummary.checkpointAgeLabel).toBe("12m");
+    expect(blockedSummary.status).toBe("blocked");
+    expect(blockedSummary.headline).toContain("Health check failed");
+    expect(blockedSummary.nextSteps[0]).toContain("Create a checkpoint");
   });
 
   it("rejects invalid release health and rollback inputs", () => {

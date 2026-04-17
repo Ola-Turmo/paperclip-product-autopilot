@@ -3,6 +3,8 @@ import type {
   Checkpoint,
   DeliveryRun,
   Digest,
+  KnowledgeEntry,
+  LearnerSummary,
   OperatorIntervention,
   ReleaseHealthCheck,
   RollbackAction,
@@ -95,6 +97,41 @@ describe("audit timeline", () => {
       relatedRunId: "run-1",
       createdAt: "2026-01-03T00:18:00.000Z",
     }];
+    const summaries: LearnerSummary[] = [{
+      summaryId: "summary-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: "run-1",
+      ideaId: "idea-1",
+      sourceRollbackId: "rb-1",
+      sourceCheckId: "check-1",
+      sourceCheckpointId: "cp-1",
+      sourceDigestId: "dg-1",
+      title: "Rollback recovery for Improve onboarding",
+      summaryText: "Smoke failed | restore checkpoint completed | recovery time 10m",
+      keyLearnings: ["Failed check: Smoke"],
+      skillsReinjected: ["checkpoint restore"],
+      metrics: { duration: 600000 },
+      createdAt: "2026-01-03T00:16:00.000Z",
+    }];
+    const knowledgeEntries: KnowledgeEntry[] = [{
+      entryId: "knowledge-1",
+      companyId: "company-1",
+      projectId: "project-1",
+      knowledgeType: "procedure",
+      title: "Recovery procedure: restore checkpoint",
+      content: "Run: Improve onboarding",
+      sourceRunId: "run-1",
+      sourceSummaryId: "summary-1",
+      sourceRollbackId: "rb-1",
+      sourceCheckId: "check-1",
+      sourceCheckpointId: "cp-1",
+      sourceDigestId: "dg-1",
+      usageCount: 0,
+      tags: ["rollback"],
+      createdAt: "2026-01-03T00:17:00.000Z",
+      updatedAt: "2026-01-03T00:17:00.000Z",
+    }];
 
     const events = buildRunAuditTimeline({
       run,
@@ -103,11 +140,16 @@ describe("audit timeline", () => {
       checkpoints,
       rollbacks,
       digests,
+      summaries,
+      knowledgeEntries,
     });
 
     expect(events[0]?.id).toBe("dg-1");
-    expect(events[1]?.id).toBe("rb-1");
+    expect(events[1]?.id).toBe("knowledge-1");
+    expect(events[2]?.id).toBe("summary-1");
+    expect(events[3]?.id).toBe("rb-1");
     expect(events.some((event) => event.detail.includes("build failure"))).toBe(true);
+    expect(events.some((event) => event.detail.includes("digest dg-1"))).toBe(true);
     expect(events.at(-1)?.id).toBe("run-created-run-1");
   });
 });

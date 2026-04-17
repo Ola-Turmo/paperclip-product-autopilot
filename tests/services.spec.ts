@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildAutopilotOverview, computeBudgetUsagePercent } from "../src/services/overview.js";
 import {
   createBudgetAlertDigest,
+  createHealthCheckFailedDigest,
   createStuckRunDigest,
   shouldPauseForBudget,
 } from "../src/services/policy.js";
@@ -168,5 +169,32 @@ describe("policy service", () => {
     expect(digest?.digestType).toBe("stuck_run");
     expect(digest?.relatedRunId).toBe("run-1");
     expect(digest?.details[0]).toContain("Improve onboarding");
+  });
+
+  it("creates a health-check failure digest with blocking guidance", () => {
+    const digest = createHealthCheckFailedDigest({
+      digestId: "digest-4",
+      companyId: "company-1",
+      projectId: "project-1",
+      run: createRun(),
+      check: {
+        checkId: "check-1",
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-1",
+        checkType: "smoke_test",
+        name: "Smoke",
+        status: "failed",
+        errorMessage: "Homepage 500",
+        failedAt: "2026-01-01T00:30:00.000Z",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+      createdAt: "2026-01-01T00:31:00.000Z",
+    });
+
+    expect(digest.digestType).toBe("health_check_failed");
+    expect(digest.relatedRunId).toBe("run-1");
+    expect(digest.urgency).toBe("blocking");
+    expect(digest.recommendedAction).toContain("rollback");
   });
 });

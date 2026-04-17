@@ -15,6 +15,7 @@ export interface ResearchSignalInput {
     | "custom";
   sourceId?: string;
   sourceTimestamp?: string;
+  ingestedAt?: string;
   evidenceText?: string;
   category?: ResearchFinding["category"];
 }
@@ -137,15 +138,60 @@ export function inferTopic(input: {
 
 export function normalizeResearchSignalInput(input: ResearchSignalInput): Required<Pick<ResearchFinding, "sourceType" | "sourceLabel" | "ingestedAt">> & Pick<ResearchFinding, "sourceUrl" | "sourceId" | "sourceTimestamp"> {
   const sourceType = input.sourceType ?? inferSourceType(input);
-  const sourceLabel = input.sourceLabel ?? sourceType.replace(/_/g, " ");
+  const sourceLabel = normalizeSourceLabel(input.sourceLabel ?? sourceType.replace(/_/g, " "));
   return {
     sourceType,
     sourceLabel,
     sourceUrl: input.sourceUrl,
     sourceId: input.sourceId,
     sourceTimestamp: input.sourceTimestamp,
-    ingestedAt: new Date().toISOString(),
+    ingestedAt: input.ingestedAt ?? new Date().toISOString(),
   };
+}
+
+function normalizeSourceLabel(sourceLabel: string): string {
+  return sourceLabel.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+export function normalizeSourceDomain(sourceUrl?: string): string | undefined {
+  if (!sourceUrl) return undefined;
+  try {
+    const hostname = new URL(sourceUrl).hostname.toLowerCase();
+    return hostname.replace(/^www\./, "");
+  } catch {
+    return undefined;
+  }
+}
+
+export function inferSourceScope(input: {
+  sourceType?: ResearchFinding["sourceType"];
+  sourceUrl?: string;
+  sourceLabel?: string;
+}): NonNullable<ResearchFinding["sourceScope"]> {
+  const label = input.sourceLabel?.toLowerCase() ?? "";
+  const domain = normalizeSourceDomain(input.sourceUrl) ?? "";
+
+  if (input.sourceType === "support_ticket" || input.sourceType === "survey_response") return "customer";
+  if (input.sourceType === "analytics_report" || input.sourceType === "incident_postmortem" || input.sourceType === "code_signal") return "internal";
+  if (input.sourceType === "competitor_note") return "external";
+  if (label.includes("support") || label.includes("survey") || label.includes("feedback")) return "customer";
+  if (label.includes("incident") || label.includes("analytics") || domain.includes("github.com") || domain.includes("localhost")) return "internal";
+  return "external";
+}
+
+export function buildNormalizedSourceKey(input: {
+  sourceType?: ResearchFinding["sourceType"];
+  sourceId?: string;
+  sourceDomain?: string;
+  sourceLabel?: string;
+}): string | undefined {
+  if (!input.sourceType) return undefined;
+  const identifier =
+    input.sourceId?.trim() ||
+    input.sourceDomain?.trim() ||
+    normalizeText(input.sourceLabel).slice(0, 40) ||
+    "unknown-source";
+  return `${input.sourceType}:${identifier}`;
 }
 
 function inferSourceType(input: Pick<ResearchSignalInput, "sourceUrl" | "sourceLabel" | "category">): NonNullable<ResearchFinding["sourceType"]> {
@@ -175,14 +221,27 @@ export function createResearchFindingRecord(input: {
   sourceType?: ResearchFinding["sourceType"];
   sourceId?: string;
   sourceTimestamp?: string;
+  ingestedAt?: string;
   evidenceText?: string;
   category?: ResearchFinding["category"];
 }): ResearchFinding {
   const normalizedSignal = normalizeResearchSignalInput(input);
+  const sourceDomain = normalizeSourceDomain(normalizedSignal.sourceUrl);
+  const sourceScope = inferSourceScope({
+    sourceType: normalizedSignal.sourceType,
+    sourceUrl: normalizedSignal.sourceUrl,
+    sourceLabel: normalizedSignal.sourceLabel,
+  });
   const topic = inferTopic(input);
   const signalFamily = inferSignalFamily({
     ...input,
     sourceType: normalizedSignal.sourceType,
+    sourceLabel: normalizedSignal.sourceLabel,
+  });
+  const normalizedSourceKey = buildNormalizedSourceKey({
+    sourceType: normalizedSignal.sourceType,
+    sourceId: normalizedSignal.sourceId,
+    sourceDomain,
     sourceLabel: normalizedSignal.sourceLabel,
   });
   const dedupeKey = `${topic}|${normalizeText(input.title).slice(0, 80)}`;
@@ -200,6 +259,9 @@ export function createResearchFindingRecord(input: {
     sourceId: normalizedSignal.sourceId,
     sourceTimestamp: normalizedSignal.sourceTimestamp,
     ingestedAt: normalizedSignal.ingestedAt,
+    sourceDomain,
+    sourceScope,
+    normalizedSourceKey,
     evidenceText: input.evidenceText,
     signalFamily,
     topic,
@@ -268,6 +330,9 @@ export function findDuplicateResearchFinding(
 export function buildResearchCycleSnapshot(findings: ResearchFinding[], generatedAt: string) {
   const topicCounts: Record<string, number> = {};
   const signalFamilyCounts: Record<string, number> = {};
+  const sourceTypeCounts: Record<string, number> = {};
+  const sourceScopeCounts: Record<string, number> = {};
+  const sourceDomainCounts: Record<string, number> = {};
 
   let freshnessTotal = 0;
   let sourceQualityTotal = 0;
@@ -280,6 +345,15 @@ export function buildResearchCycleSnapshot(findings: ResearchFinding[], generate
     if (finding.signalFamily) {
       signalFamilyCounts[finding.signalFamily] = (signalFamilyCounts[finding.signalFamily] ?? 0) + 1;
     }
+    if (finding.sourceType) {
+      sourceTypeCounts[finding.sourceType] = (sourceTypeCounts[finding.sourceType] ?? 0) + 1;
+    }
+    if (finding.sourceScope) {
+      sourceScopeCounts[finding.sourceScope] = (sourceScopeCounts[finding.sourceScope] ?? 0) + 1;
+    }
+    if (finding.sourceDomain) {
+      sourceDomainCounts[finding.sourceDomain] = (sourceDomainCounts[finding.sourceDomain] ?? 0) + 1;
+    }
     freshnessTotal += finding.freshnessScore;
     sourceQualityTotal += finding.sourceQualityScore;
     if (finding.duplicateAnnotated) duplicateCount += 1;
@@ -290,6 +364,9 @@ export function buildResearchCycleSnapshot(findings: ResearchFinding[], generate
     findingIds: findings.map((finding) => finding.findingId),
     topicCounts,
     signalFamilyCounts,
+    sourceTypeCounts,
+    sourceScopeCounts,
+    sourceDomainCounts,
     averageFreshnessScore: clampScore(freshnessTotal / sampleCount),
     averageSourceQualityScore: clampScore(sourceQualityTotal / sampleCount),
     duplicateCount,

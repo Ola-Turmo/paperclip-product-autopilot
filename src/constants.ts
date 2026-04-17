@@ -174,6 +174,7 @@ export const ACTION_KEYS = {
 
   // Rollback
   triggerRollback: "trigger-rollback",
+  updateRollbackStatus: "update-rollback-status",
 
   // Admin / health
   checkStuckRuns: "check-stuck-runs",

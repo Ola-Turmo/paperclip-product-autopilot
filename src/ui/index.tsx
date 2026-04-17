@@ -26,12 +26,15 @@ import type {
   ReleaseHealthCheck,
   RollbackAction,
   ResearchCycle,
+  ResearchFinding,
 } from "../types.js";
 import { buildRunAuditTimeline } from "../services/audit.js";
 import { getDigestPolicyBenchmarkSummary, getIdeationBenchmarkSummary, getQualityScorecardSummary } from "../services/evaluation-fixtures.js";
 import { classifyFailureMessage, formatFailureCategory } from "../services/failure-taxonomy.js";
-import { describeCheckpointPolicy, summarizeReleaseHealthChecks } from "../services/lifecycle.js";
-import { requiresCheckpointForRunGate } from "../services/delivery.js";
+import { describeCheckpointPolicy, summarizeReleaseHealthChecks, summarizeRunRemediationState } from "../services/lifecycle.js";
+import { rankDigestsForInbox, summarizeBudgetConsole, summarizeDigestInbox } from "../services/operator-console.js";
+import { resolveRollbackRequest } from "../services/rollback-policy.js";
+import { describeCancellationPolicy, getRunCancellationPolicy, requiresCheckpointForRunGate } from "../services/delivery.js";
 
 const PAGE: CSSProperties = {
   display: "grid",
@@ -123,6 +126,11 @@ const STATUS: Record<string, string> = {
   completed: "#115E59",
   failed: "#DC2626",
   paused: "#B45309",
+  healthy: "#115E59",
+  attention: "#B45309",
+  blocked: "#DC2626",
+  recovering: "#0E7490",
+  recovered: "#115E59",
 };
 const STATUS_LABELS: Record<string, string> = {
   active: "aktiv",
@@ -138,6 +146,11 @@ const STATUS_LABELS: Record<string, string> = {
   read: "lest",
   dismissed: "lukket",
   cancelled: "avbrutt",
+  healthy: "stabil",
+  attention: "trenger oppmerksomhet",
+  blocked: "blokkert",
+  recovering: "gjenoppretter",
+  recovered: "gjenopprettet",
 };
 
 function toastError(toast: ReturnType<typeof usePluginToast>, title: string, error: unknown) {
@@ -215,12 +228,6 @@ function LoadingState(props: { label: string }) {
   );
 }
 
-function extractRationaleSignal(rationale: string | undefined, key: string): string | null {
-  if (!rationale) return null;
-  const match = rationale.match(new RegExp(`${key}=([^,]+)`));
-  return match?.[1]?.trim() ?? null;
-}
-
 function OverviewHero(props: { project: AutopilotProject | null; overview: AutopilotOverview }) {
   const projectLabel = props.project?.productType ?? "digital tjeneste";
   const tier = props.project?.automationTier ?? "supervised";
@@ -273,6 +280,19 @@ function OverviewHero(props: { project: AutopilotProject | null; overview: Autop
   );
 }
 
+function describeRollbackChoice(rollbackType: RollbackAction["rollbackType"]): string {
+  switch (rollbackType) {
+    case "restore_checkpoint":
+      return "Restore Checkpoint";
+    case "revert_commit":
+      return "Revert Commit";
+    case "full_rollback":
+      return "Full Rollback";
+    default:
+      return rollbackType;
+  }
+}
+
 function PreferenceSignalsCard(props: { companyId: string; projectId: string }) {
   const { data: profile } = usePluginData<PreferenceProfile | null>(DATA_KEYS.preferenceProfile, {
     companyId: props.companyId,
@@ -283,6 +303,8 @@ function PreferenceSignalsCard(props: { companyId: string; projectId: string }) 
   const topCategory = Object.entries(preferenceProfile?.categoryPreferences ?? {})
     .sort(([, left], [, right]) => (right.yes + right.now - right.pass) - (left.yes + left.now - left.pass))[0];
   const topComplexity = Object.entries(preferenceProfile?.complexityPreferences ?? {})
+    .sort(([, left], [, right]) => (right.yes + right.now - right.pass) - (left.yes + left.now - left.pass))[0];
+  const topExecutionMode = Object.entries(preferenceProfile?.executionModePreferences ?? {})
     .sort(([, left], [, right]) => (right.yes + right.now - right.pass) - (left.yes + left.now - left.pass))[0];
 
   return (
@@ -320,6 +342,10 @@ function PreferenceSignalsCard(props: { companyId: string; projectId: string }) 
             <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
               <div style={{ fontWeight: 700, color: "#0f172a" }}>Top Complexity Preference</div>
               <div style={MUTED}>{topComplexity ? topComplexity[0] : "No clear complexity preference yet"}</div>
+            </div>
+            <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+              <div style={{ fontWeight: 700, color: "#0f172a" }}>Top Execution Mode Preference</div>
+              <div style={MUTED}>{topExecutionMode ? topExecutionMode[0] : "No clear execution-mode preference yet"}</div>
             </div>
           </div>
         </div>
@@ -454,6 +480,10 @@ function ResearchCard(props: { companyId: string; projectId: string; onRefresh: 
     companyId: props.companyId,
     projectId: props.projectId,
   });
+  const { data: findings } = usePluginData<ResearchFinding[]>(DATA_KEYS.researchFindings, {
+    companyId: props.companyId,
+    projectId: props.projectId,
+  });
   const [query, setQuery] = useState("Research product improvement opportunities");
 
   async function handleStartResearch() {
@@ -477,6 +507,9 @@ function ResearchCard(props: { companyId: string; projectId: string; onRefresh: 
   }
 
   const latestCycle = cycles?.[0] ?? null;
+  const cycleFindings = (findings ?? [])
+    .filter((finding) => !latestCycle || finding.cycleId === latestCycle.cycleId)
+    .slice(0, 4);
 
   return (
     <Section
@@ -511,10 +544,42 @@ function ResearchCard(props: { companyId: string; projectId: string; onRefresh: 
                 <div style={{ fontSize: 12, color: "#475569" }}>
                   Duplicate findings {latestCycle.snapshot.duplicateCount} | Topics {Object.keys(latestCycle.snapshot.topicCounts).slice(0, 3).join(", ") || "n/a"}
                 </div>
+                <div style={{ fontSize: 12, color: "#475569" }}>
+                  Source types {Object.keys(latestCycle.snapshot.sourceTypeCounts).slice(0, 3).join(", ") || "n/a"} | Source scopes {Object.keys(latestCycle.snapshot.sourceScopeCounts).slice(0, 3).join(", ") || "n/a"}
+                </div>
               </div>
             ) : null}
           </div>
         )}
+        {cycleFindings.length ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            {cycleFindings.map((finding) => (
+              <div key={finding.findingId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ fontWeight: 700, color: "#0f172a" }}>{finding.title}</div>
+                  <div style={{ fontSize: 12, color: "#475569" }}>{finding.signalFamily ?? "unknown"}</div>
+                </div>
+                <div style={{ ...MUTED, marginTop: 6 }}>{finding.description}</div>
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                  Source {finding.sourceLabel ?? finding.sourceDomain ?? "n/a"} | Type {finding.sourceType ?? "n/a"} | Scope {finding.sourceScope ?? "n/a"}
+                </div>
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>
+                  Confidence {finding.confidence.toFixed(2)} | Freshness {finding.freshnessScore} | Source quality {finding.sourceQualityScore}
+                </div>
+                {finding.evidenceText ? (
+                  <div style={{ fontSize: 12, color: "#0f172a", marginTop: 6 }}>
+                    Evidence: {finding.evidenceText}
+                  </div>
+                ) : null}
+                {finding.sourceUrl ? (
+                  <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                    Source URL: {finding.sourceUrl}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </Section>
   );
@@ -550,9 +615,24 @@ function IdeasCard(props: { companyId: string; projectId: string }) {
                   Why: {idea.rationale}
                 </div>
               ) : null}
-              {extractRationaleSignal(idea.rationale, "preferenceBoost") ? (
+              {idea.rankingExplanation ? (
                 <div style={{ fontSize: 12, color: "#0f766e", marginTop: 6 }}>
-                  Preference boost {extractRationaleSignal(idea.rationale, "preferenceBoost")} | Complexity boost {extractRationaleSignal(idea.rationale, "complexityPreferenceBoost") ?? "0.0"} | Outcome boost {extractRationaleSignal(idea.rationale, "outcomeBoost") ?? "0.0"}
+                  Ranking {idea.rankingExplanation.rankingScore} | Execution mode {idea.rankingExplanation.provisionalExecutionMode} | Preference boost {idea.rankingExplanation.preferenceBoost.toFixed(1)} | Complexity boost {idea.rankingExplanation.complexityPreferenceBoost.toFixed(1)} | Execution-mode boost {idea.rankingExplanation.executionModePreferenceBoost.toFixed(1)} | Outcome boost {idea.rankingExplanation.outcomeBoost.toFixed(1)}
+                </div>
+              ) : null}
+              {idea.rankingExplanation ? (
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>
+                  Confidence {idea.rankingExplanation.confidence.toFixed(2)} | Freshness {idea.rankingExplanation.freshnessScore} | Source quality {idea.rankingExplanation.sourceQualityScore} | Outcome evidence {idea.rankingExplanation.outcomeEvidenceCount}
+                </div>
+              ) : null}
+              {idea.technicalApproach ? (
+                <div style={{ fontSize: 12, color: "#0f172a", marginTop: 6 }}>
+                  Evidence: {idea.technicalApproach}
+                </div>
+              ) : null}
+              {idea.risks?.length ? (
+                <div style={{ fontSize: 12, color: "#92400e", marginTop: 6 }}>
+                  Risks: {idea.risks.join(" | ")}
                 </div>
               ) : null}
               {idea.duplicateAnnotated ? (
@@ -562,7 +642,7 @@ function IdeasCard(props: { companyId: string; projectId: string }) {
               ) : null}
               {idea.sourceReferences?.length ? (
                 <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
-                  Source: {idea.sourceReferences[0]}
+                  Sources: {idea.sourceReferences.slice(0, 2).join(" | ")}
                 </div>
               ) : null}
               <div style={{ ...MUTED, marginTop: 6 }}>
@@ -633,6 +713,16 @@ function BudgetControlCard(props: { companyId: string; onSaved: () => void }) {
 
   const usagePercent =
     autopilotBudgetMinutes > 0 ? Math.round((autopilotUsedMinutes / autopilotBudgetMinutes) * 100) : 0;
+  const budgetSummary = summarizeBudgetConsole(budget ?? {
+    budgetId: "draft-budget",
+    companyId: props.companyId,
+    totalBudgetMinutes: 0,
+    usedBudgetMinutes: 0,
+    autopilotBudgetMinutes,
+    autopilotUsedMinutes,
+    paused: false,
+    updatedAt: new Date().toISOString(),
+  });
 
   async function handleSave() {
     try {
@@ -652,7 +742,7 @@ function BudgetControlCard(props: { companyId: string; onSaved: () => void }) {
     <Section
       title="Budsjett og kapasitet"
       subtitle="Hold autopilot innenfor trygge rammer. Dette er operativt budsjett, ikke bare en passiv statusindikator."
-      action={<StatusPill status={budget?.paused ? "paused" : usagePercent >= 100 ? "failed" : "active"} />}
+      action={<StatusPill status={budget?.paused ? "paused" : budgetSummary.status === "healthy" ? "active" : budgetSummary.status === "attention" ? "maybe" : "failed"} />}
     >
       <div style={{ display: "grid", gap: 12 }}>
         <div style={GRID}>
@@ -667,6 +757,19 @@ function BudgetControlCard(props: { companyId: string; onSaved: () => void }) {
           <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{autopilotBudgetMinutes}</div>
             <div style={MUTED}>Allowed Minutes</div>
+          </div>
+          <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{budgetSummary.remainingMinutes}</div>
+            <div style={MUTED}>Remaining Minutes</div>
+          </div>
+        </div>
+        <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+          <div style={{ fontWeight: 700, color: "#0f172a" }}>Budget Guidance</div>
+          <div style={{ ...MUTED, marginTop: 6 }}>
+            State {budgetSummary.status} | Usage {usagePercent}% | {budgetSummary.overageMinutes > 0 ? `Overage ${budgetSummary.overageMinutes} min` : `Remaining ${budgetSummary.remainingMinutes} min`}
+          </div>
+          <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+            {budgetSummary.recommendedAction}
           </div>
         </div>
         <div style={GRID}>
@@ -709,6 +812,8 @@ function DigestsCard(props: { companyId: string; projectId: string; onRefresh: (
     companyId: props.companyId,
     projectId: props.projectId,
   });
+  const inboxSummary = summarizeDigestInbox(digests ?? []);
+  const rankedDigests = rankDigestsForInbox(digests ?? []);
 
   async function handleDismiss(digestId: string) {
     try {
@@ -725,6 +830,22 @@ function DigestsCard(props: { companyId: string; projectId: string; onRefresh: (
     }
   }
 
+  async function handleMarkRead(digestId: string) {
+    try {
+      await dismissDigest({
+        companyId: props.companyId,
+        projectId: props.projectId,
+        digestId,
+        status: "read",
+      });
+      toast({ title: "Digest marked as read", tone: "success" });
+      refresh();
+      props.onRefresh();
+    } catch (error) {
+      toastError(toast, "Failed to mark digest as read", error);
+    }
+  }
+
   return (
     <Section
       title="Operatørinnboks"
@@ -737,7 +858,23 @@ function DigestsCard(props: { companyId: string; projectId: string; onRefresh: (
         />
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
-          {digests.slice(0, 8).map((digest) => (
+          <div style={{ ...CARD, padding: 12, boxShadow: "none" }}>
+            <div style={{ fontWeight: 700, color: "#0f172a" }}>Inbox Summary</div>
+            <div style={{ ...MUTED, marginTop: 6 }}>
+              Actionable {inboxSummary.actionableCount} | Blocking {inboxSummary.blockingCount} | Intervention required {inboxSummary.interventionRequiredCount} | Escalated {inboxSummary.escalatedCount} | Unread {inboxSummary.unreadCount}
+            </div>
+            {inboxSummary.highestUrgency !== "none" ? (
+              <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                Highest urgency: {inboxSummary.highestUrgency.replace(/_/g, " ")}
+              </div>
+            ) : null}
+            {inboxSummary.nextRecommendedAction ? (
+              <div style={{ fontSize: 12, color: "#475569", marginTop: 6 }}>
+                Next recommended action: {inboxSummary.nextRecommendedAction}
+              </div>
+            ) : null}
+          </div>
+          {rankedDigests.slice(0, 8).map((digest) => (
             <div key={digest.digestId} style={{ ...CARD, padding: 14, boxShadow: "none", borderLeft: `6px solid ${STATUS[digest.priority === "critical" ? "failed" : digest.priority === "high" ? "maybe" : "approved"] ?? "#64748b"}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
                 <div style={{ fontWeight: 700, color: "#0f172a" }}>{digest.title}</div>
@@ -778,7 +915,12 @@ function DigestsCard(props: { companyId: string; projectId: string; onRefresh: (
                 </div>
               ) : null}
               {digest.status !== "dismissed" ? (
-                <div style={{ marginTop: 10 }}>
+                <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {(digest.status === "pending" || digest.status === "delivered") ? (
+                    <button onClick={() => handleMarkRead(digest.digestId)} style={BUTTON_SECONDARY}>
+                      Mark Read
+                    </button>
+                  ) : null}
                   <button onClick={() => handleDismiss(digest.digestId)} style={BUTTON_SECONDARY}>
                     Dismiss
                   </button>
@@ -926,6 +1068,8 @@ function AuditTimeline(props: {
   checkpoints: Checkpoint[];
   rollbacks: RollbackAction[];
   digests: Digest[];
+  summaries: LearnerSummary[];
+  knowledgeEntries: KnowledgeEntry[];
 }) {
   const events = buildRunAuditTimeline(props);
 
@@ -1166,6 +1310,8 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
   const cancelRun = usePluginAction(ACTION_KEYS.cancelDeliveryRun);
   const pauseRun = usePluginAction(ACTION_KEYS.pauseDeliveryRun);
   const resumeRun = usePluginAction(ACTION_KEYS.resumeDeliveryRun);
+  const createCheckpoint = usePluginAction(ACTION_KEYS.createCheckpoint);
+  const triggerRollback = usePluginAction(ACTION_KEYS.triggerRollback);
   const requestCheckpoint = usePluginAction(ACTION_KEYS.requestCheckpoint);
   const addOperatorNote = usePluginAction(ACTION_KEYS.addOperatorNote);
   const [operatorNote, setOperatorNote] = useState("");
@@ -1179,12 +1325,12 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
     projectId: context.projectId ?? "",
     runId: context.entityId,
   });
-  const { data: checks } = usePluginData<ReleaseHealthCheck[]>(DATA_KEYS.releaseHealthChecks, {
+  const { data: checks, refresh: refreshChecks } = usePluginData<ReleaseHealthCheck[]>(DATA_KEYS.releaseHealthChecks, {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
     runId: context.entityId,
   });
-  const { data: rollbacks } = usePluginData<RollbackAction[]>(DATA_KEYS.rollbackActions, {
+  const { data: rollbacks, refresh: refreshRollbacks } = usePluginData<RollbackAction[]>(DATA_KEYS.rollbackActions, {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
     runId: context.entityId,
@@ -1199,23 +1345,26 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
     projectId: context.projectId ?? "",
     runId: context.entityId,
   });
-  const { data: digests } = usePluginData<Digest[]>(DATA_KEYS.digests, {
+  const { data: digests, refresh: refreshDigests } = usePluginData<Digest[]>(DATA_KEYS.digests, {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
   });
   const { data: summaries } = usePluginData<LearnerSummary[]>(DATA_KEYS.learnerSummaries, {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
+    runId: context.entityId,
   });
   const { data: knowledge } = usePluginData<KnowledgeEntry[]>(DATA_KEYS.knowledgeEntries, {
     companyId: context.companyId,
     projectId: context.projectId ?? "",
+    sourceRunId: context.entityId,
   });
   const healthSummary = summarizeReleaseHealthChecks(checks ?? []);
   const checkpointPolicy = requiresCheckpointForRunGate({
     artifact: planningArtifact ?? undefined,
     checkpoints: checkpoints ?? [],
   });
+  const runCancellationPolicy = getRunCancellationPolicy(planningArtifact ?? undefined);
 
   if (!run) {
     return (
@@ -1225,11 +1374,78 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
     );
   }
   const activeRun = run;
+  const remediationSummary = summarizeRunRemediationState({
+    run: activeRun,
+    checks: checks ?? [],
+    rollbacks: rollbacks ?? [],
+    checkpoints: checkpoints ?? [],
+    artifact: planningArtifact ?? undefined,
+  });
 
   async function refreshRunViews() {
     refreshRun();
     refreshCheckpoints();
+    refreshChecks();
+    refreshRollbacks();
+    refreshDigests();
     refreshInterventions();
+  }
+
+  async function handleCreateCheckpoint(label?: string) {
+    try {
+      await createCheckpoint({
+        companyId: context.companyId,
+        projectId: context.projectId ?? "",
+        runId: activeRun.runId,
+        label: label ?? (operatorNote.trim() || "Checkpoint before remediation"),
+        pauseReason: operatorNote.trim() || "Checkpoint created from run detail remediation flow",
+      });
+      toast({ title: "Checkpoint created", tone: "success" });
+      await refreshRunViews();
+    } catch (error) {
+      toastError(toast, "Failed to create checkpoint", error);
+    }
+  }
+
+  async function handleRollback(check: ReleaseHealthCheck) {
+    const resolved = resolveRollbackRequest({
+      run: activeRun,
+      check,
+      checkpoints: checkpoints ?? [],
+    });
+    const governanceNote =
+      resolved.rollbackType === "full_rollback" || resolved.rollbackType === "revert_commit"
+        ? operatorNote.trim() || undefined
+        : undefined;
+    if ((resolved.rollbackType === "full_rollback" || resolved.rollbackType === "revert_commit") && !governanceNote) {
+      toast({
+        title: "Add an operator note first",
+        body: `${describeRollbackChoice(resolved.rollbackType)} requires a governance note in the operator note field.`,
+        tone: "error",
+      });
+      return;
+    }
+
+    try {
+      await triggerRollback({
+        companyId: context.companyId,
+        projectId: context.projectId ?? "",
+        runId: activeRun.runId,
+        checkId: check.checkId,
+        rollbackType: resolved.rollbackType,
+        checkpointId: resolved.checkpointId,
+        targetCommitSha: resolved.targetCommitSha,
+        governanceNote,
+        operatorAcknowledged:
+          resolved.rollbackType === "full_rollback" || resolved.rollbackType === "revert_commit"
+            ? true
+            : undefined,
+      });
+      toast({ title: `${describeRollbackChoice(resolved.rollbackType)} requested`, tone: "success" });
+      await refreshRunViews();
+    } catch (error) {
+      toastError(toast, "Failed to trigger rollback", error);
+    }
   }
 
   async function handlePauseResume() {
@@ -1345,6 +1561,12 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
                 {checkpointPolicy.required ? (checkpointPolicy.satisfied ? "Påkrevd og oppfylt" : "Påkrevd") : "Ikke påkrevd"}
               </div>
             </div>
+            <div>
+              <div style={{ ...LABEL }}>Risikonivå</div>
+              <div style={{ marginTop: 6, fontSize: 15, fontWeight: 700, color: runCancellationPolicy.riskLevel === "high" ? "#b45309" : "#0f172a" }}>
+                {runCancellationPolicy.riskLevel}
+              </div>
+            </div>
           </div>
           <div style={{ fontWeight: 700, color: "#0f172a" }}>{activeRun.title}</div>
           <div style={MUTED}>Branch: {activeRun.branchName}</div>
@@ -1355,6 +1577,10 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
             <div style={MUTED}>Failure class: {formatFailureCategory(classifyFailureMessage(activeRun.error))}</div>
           ) : null}
           <div style={MUTED}>Checkpoint policy: {describeCheckpointPolicy(planningArtifact ?? undefined)}</div>
+          <div style={MUTED}>Cancellation policy: {describeCancellationPolicy(planningArtifact ?? undefined)}</div>
+          {runCancellationPolicy.guardrails.length ? (
+            <div style={MUTED}>Guardrails: {runCancellationPolicy.guardrails.join(" • ")}</div>
+          ) : null}
           {checkpointPolicy.required ? (
             <div style={{ fontSize: 12, color: checkpointPolicy.satisfied ? "#0f766e" : "#b45309" }}>
               {checkpointPolicy.satisfied ? "Checkpoint requirement satisfied." : "Checkpoint required before risky execution."}
@@ -1375,6 +1601,36 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
             <button onClick={handleOperatorNote} style={BUTTON}>
               Add Note
             </button>
+          </div>
+        </div>
+      </Section>
+      <Section
+        title="Remediation Guidance"
+        subtitle="Avledet operatÃ¸rveiledning basert pÃ¥ helsesjekker, checkpoints og rollback-forlÃ¸pet for denne kjÃ¸ringen."
+        action={<StatusPill status={remediationSummary.status} />}
+      >
+        <div style={{ display: "grid", gap: 8 }}>
+          <div style={{ fontWeight: 700, color: "#0f172a" }}>{remediationSummary.headline}</div>
+          <div style={MUTED}>{remediationSummary.detail}</div>
+          {remediationSummary.latestCheckpointLabel ? (
+            <div style={MUTED}>Latest checkpoint: {remediationSummary.latestCheckpointLabel}</div>
+          ) : null}
+          {remediationSummary.rollbackDurationLabel ? (
+            <div style={MUTED}>Rollback duration: {remediationSummary.rollbackDurationLabel}</div>
+          ) : null}
+          {remediationSummary.recoveryTimeLabel ? (
+            <div style={MUTED}>Recovery time: {remediationSummary.recoveryTimeLabel}</div>
+          ) : null}
+          {remediationSummary.checkpointAgeLabel ? (
+            <div style={MUTED}>Checkpoint age at recovery: {remediationSummary.checkpointAgeLabel}</div>
+          ) : null}
+          <div style={{ display: "grid", gap: 6, marginTop: 4 }}>
+            <div style={{ ...LABEL }}>Next Steps</div>
+            {remediationSummary.nextSteps.map((step, index) => (
+              <div key={`${step}-${index}`} style={MUTED}>
+                {index + 1}. {step}
+              </div>
+            ))}
           </div>
         </div>
       </Section>
@@ -1405,6 +1661,41 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
                   <StatusPill status={check.status} />
                 </div>
                 <div style={{ ...MUTED, marginTop: 6 }}>Type: {check.checkType}</div>
+                {check.status === "failed" ? (() => {
+                  const recommendedRollback = resolveRollbackRequest({
+                    run: activeRun,
+                    check,
+                    checkpoints: checkpoints ?? [],
+                  });
+                  const existingRollback = (rollbacks ?? []).find(
+                    (rollback) =>
+                      rollback.checkId === check.checkId &&
+                      ["pending", "in_progress", "completed"].includes(rollback.status),
+                  );
+                  return (
+                    <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+                      <div style={{ fontSize: 12, color: "#92400e" }}>
+                        Recommended remediation: {describeRollbackChoice(recommendedRollback.rollbackType)}
+                      </div>
+                      {existingRollback ? (
+                        <div style={{ fontSize: 12, color: "#475569" }}>
+                          Existing rollback: {describeRollbackChoice(existingRollback.rollbackType)} ({existingRollback.status})
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {!checkpointPolicy.satisfied && ["running", "paused"].includes(activeRun.status) ? (
+                            <button onClick={() => handleCreateCheckpoint(`Checkpoint before ${check.name}`)} style={BUTTON_SECONDARY}>
+                              Create Checkpoint
+                            </button>
+                          ) : null}
+                          <button onClick={() => handleRollback(check)} style={BUTTON_SECONDARY}>
+                            {describeRollbackChoice(recommendedRollback.rollbackType)}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })() : null}
                 {classifyFailureMessage(check.errorMessage) ? (
                   <div style={{ fontSize: 12, color: "#92400e", marginTop: 6 }}>
                     Failure class: {formatFailureCategory(classifyFailureMessage(check.errorMessage))}
@@ -1443,30 +1734,75 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
         title="Learning and Reuse"
         subtitle="Hva lærte systemet av dette løpet, og hvilken kunnskap bør brukes igjen i neste leveranse?"
       >
-        {!summaries || summaries.filter((summary) => summary.runId === activeRun.runId).length === 0 ? (
+        {!summaries || summaries.length === 0 ? (
           <EmptyState
             title="No learner summaries for this run"
             body="Once the run completes, the system can publish a post-run summary with learnings and metrics."
           />
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
-            {summaries.filter((summary) => summary.runId === activeRun.runId).slice(0, 3).map((summary) => (
+            {summaries.slice(0, 3).map((summary) => (
               <div key={summary.summaryId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
                 <div style={{ fontWeight: 700, color: "#0f172a" }}>{summary.title}</div>
                 <div style={{ ...MUTED, marginTop: 6 }}>{summary.summaryText}</div>
+                {[
+                  summary.sourceRollbackId ? `Rollback: ${summary.sourceRollbackId}` : null,
+                  summary.sourceCheckId ? `Check: ${summary.sourceCheckId}` : null,
+                  summary.sourceCheckpointId ? `Checkpoint: ${summary.sourceCheckpointId}` : null,
+                  summary.sourceDigestId ? `Digest: ${summary.sourceDigestId}` : null,
+                ].filter(Boolean).length ? (
+                  <div style={{ ...MUTED, marginTop: 6 }}>
+                    Links: {[
+                      summary.sourceRollbackId ? `Rollback: ${summary.sourceRollbackId}` : null,
+                      summary.sourceCheckId ? `Check: ${summary.sourceCheckId}` : null,
+                      summary.sourceCheckpointId ? `Checkpoint: ${summary.sourceCheckpointId}` : null,
+                      summary.sourceDigestId ? `Digest: ${summary.sourceDigestId}` : null,
+                    ].filter(Boolean).join(" | ")}
+                  </div>
+                ) : null}
+                {summary.keyLearnings.length ? (
+                  <div style={{ ...MUTED, marginTop: 6 }}>
+                    Learnings: {summary.keyLearnings.slice(0, 3).join(" | ")}
+                  </div>
+                ) : null}
+                {summary.skillsReinjected.length ? (
+                  <div style={{ ...MUTED, marginTop: 6 }}>
+                    Skills reinjected: {summary.skillsReinjected.join(" | ")}
+                  </div>
+                ) : null}
+                {summary.metrics.duration ? (
+                  <div style={{ ...MUTED, marginTop: 6 }}>Recovery metric: {summary.metrics.duration} ms</div>
+                ) : null}
               </div>
             ))}
           </div>
         )}
-        {knowledge && knowledge.some((entry) => entry.sourceRunId === activeRun.runId) ? (
+        {knowledge && knowledge.length ? (
           <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-            {knowledge.filter((entry) => entry.sourceRunId === activeRun.runId).slice(0, 3).map((entry) => (
+            {knowledge.slice(0, 3).map((entry) => (
               <div key={entry.entryId} style={{ ...CARD, padding: 12, boxShadow: "none" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                   <div style={{ fontWeight: 700, color: "#0f172a" }}>{entry.title}</div>
                   <div style={MUTED}>{entry.knowledgeType}</div>
                 </div>
                 <div style={{ ...MUTED, marginTop: 6 }}>{entry.content.slice(0, 180)}</div>
+                {[
+                  entry.sourceSummaryId ? `Summary: ${entry.sourceSummaryId}` : null,
+                  entry.sourceRollbackId ? `Rollback: ${entry.sourceRollbackId}` : null,
+                  entry.sourceCheckId ? `Check: ${entry.sourceCheckId}` : null,
+                  entry.sourceCheckpointId ? `Checkpoint: ${entry.sourceCheckpointId}` : null,
+                  entry.sourceDigestId ? `Digest: ${entry.sourceDigestId}` : null,
+                ].filter(Boolean).length ? (
+                  <div style={{ ...MUTED, marginTop: 6 }}>
+                    Links: {[
+                      entry.sourceSummaryId ? `Summary: ${entry.sourceSummaryId}` : null,
+                      entry.sourceRollbackId ? `Rollback: ${entry.sourceRollbackId}` : null,
+                      entry.sourceCheckId ? `Check: ${entry.sourceCheckId}` : null,
+                      entry.sourceCheckpointId ? `Checkpoint: ${entry.sourceCheckpointId}` : null,
+                      entry.sourceDigestId ? `Digest: ${entry.sourceDigestId}` : null,
+                    ].filter(Boolean).join(" | ")}
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
@@ -1479,6 +1815,8 @@ export function AutopilotRunDetailTab({ context }: PluginDetailTabProps) {
         checkpoints={checkpoints ?? []}
         rollbacks={rollbacks ?? []}
         digests={(digests ?? []).filter((digest) => digest.relatedRunId === activeRun.runId)}
+        summaries={summaries ?? []}
+        knowledgeEntries={knowledge ?? []}
       />
     </div>
   );

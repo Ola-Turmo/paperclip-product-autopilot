@@ -77,6 +77,10 @@ function createPreferenceProfile(overrides: Partial<PreferenceProfile> = {}): Pr
       low: { pass: 0, maybe: 0, yes: 1, now: 1 },
       medium: { pass: 0, maybe: 1, yes: 1, now: 1 },
     },
+    executionModePreferences: {
+      simple: { pass: 0, maybe: 1, yes: 2, now: 2 },
+      convoy: { pass: 0, maybe: 0, yes: 0, now: 0 },
+    },
     avgApprovedScore: 78,
     avgRejectedScore: 32,
     lastUpdated: "2026-01-01T00:00:00.000Z",
@@ -107,6 +111,11 @@ function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFindin
     description: "Users drop before activation",
     sourceUrl: "https://example.com/support",
     sourceLabel: "support-summary",
+    sourceType: "support_ticket",
+    ingestedAt: "2026-01-01T00:05:00.000Z",
+    sourceDomain: "example.com",
+    sourceScope: "customer",
+    normalizedSourceKey: "support_ticket:example.com",
     category: "user_feedback",
     confidence: 0.9,
     signalFamily: "support",
@@ -318,6 +327,73 @@ describe("worker integration", () => {
     expect(locks.find((lock) => lock.data.runId === run.runId)?.data.isActive).toBe(false);
   });
 
+  it("requires a checkpoint or governed force-cancel for risky runs", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject({ automationTier: "fullauto" }));
+    await upsertIdea(
+      harness.ctx,
+      createIdea({
+        ideaId: "idea-risky-cancel",
+        status: "approved",
+        complexityEstimate: "high",
+      }),
+    );
+
+    const artifact = await harness.performAction<{
+      artifactId: string;
+      cancellationPolicy: string;
+      checkpointRequired: boolean;
+    }>(ACTION_KEYS.createPlanningArtifact, {
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-risky-cancel",
+      executionMode: "convoy",
+    });
+    const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-risky-cancel",
+      artifactId: artifact.artifactId,
+    });
+    await harness.performAction(ACTION_KEYS.resumeDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+    });
+
+    expect(artifact.cancellationPolicy).toBe("checkpoint_or_acknowledged_force");
+    expect(artifact.checkpointRequired).toBe(true);
+
+    await expect(
+      harness.performAction(ACTION_KEYS.cancelDeliveryRun, {
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: run.runId,
+        reason: "Stopping the run without a checkpoint",
+      }),
+    ).rejects.toThrow("checkpoint before cancellation");
+
+    await expect(
+      harness.performAction(ACTION_KEYS.cancelDeliveryRun, {
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: run.runId,
+        reason: "Emergency stop",
+        force: true,
+      }),
+    ).rejects.toThrow("operator acknowledgment");
+
+    const cancelled = await harness.performAction<{ status: string }>(ACTION_KEYS.cancelDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      reason: "Emergency stop after operator review",
+      force: true,
+      operatorAcknowledged: true,
+    });
+
+    expect(cancelled.status).toBe("cancelled");
+  });
+
   it("resurfaces old maybe-pool ideas when the scheduled job runs", async () => {
     await upsertAutopilotProject(
       harness.ctx,
@@ -489,13 +565,19 @@ describe("worker integration", () => {
       status: "failed",
       errorMessage: "boom",
     });
-    await harness.performAction(ACTION_KEYS.triggerRollback, {
+    const rollback = await harness.performAction<{ rollbackId: string }>(ACTION_KEYS.triggerRollback, {
       companyId: "company-1",
       projectId: "project-1",
       runId: run.runId,
       checkId: check.checkId,
       rollbackType: "restore_checkpoint",
       checkpointId: checkpoint.checkpointId,
+    });
+    await harness.performAction(ACTION_KEYS.updateRollbackStatus, {
+      companyId: "company-1",
+      projectId: "project-1",
+      rollbackId: rollback.rollbackId,
+      status: "completed",
     });
 
     expect(harness.metrics.map((entry) => entry.name)).toEqual(
@@ -504,6 +586,10 @@ describe("worker integration", () => {
         "release_health.created",
         "release_health.updated",
         "rollback.triggered",
+        "rollback.completed",
+        "rollback.duration_ms",
+        "rollback.recovery_time_ms",
+        "rollback.checkpoint_age_ms",
       ]),
     );
     expect(harness.telemetry.map((entry) => entry.eventName)).toEqual(
@@ -512,6 +598,9 @@ describe("worker integration", () => {
         "release_health_created",
         "release_health_updated",
         "rollback_triggered",
+        "rollback.duration_ms.recorded",
+        "rollback.recovery_time_ms.recorded",
+        "rollback.checkpoint_age_ms.recorded",
       ]),
     );
   });
@@ -705,6 +794,277 @@ describe("worker integration", () => {
     expect(rollback.rollbackType).toBe("full_rollback");
   });
 
+  it("requires explicit acknowledgment for revert-commit rollback", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertIdea(harness.ctx, createIdea({ ideaId: "idea-revert-rollback", status: "approved" }));
+    const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-revert-rollback",
+      artifactId: "artifact-revert-rollback",
+    });
+    await harness.performAction(ACTION_KEYS.resumeDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+    });
+    const check = await harness.performAction<{ checkId: string }>(ACTION_KEYS.createReleaseHealthCheck, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkType: "smoke_test",
+      name: "Smoke",
+    });
+    await harness.performAction(ACTION_KEYS.updateReleaseHealthStatus, {
+      companyId: "company-1",
+      projectId: "project-1",
+      checkId: check.checkId,
+      status: "failed",
+      errorMessage: "boom",
+    });
+
+    await expect(
+      harness.performAction(ACTION_KEYS.triggerRollback, {
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: run.runId,
+        checkId: check.checkId,
+        rollbackType: "revert_commit",
+        targetCommitSha: "abc1234",
+      }),
+    ).rejects.toThrow("operator acknowledgment");
+
+    const rollback = await harness.performAction<{ rollbackType: string; targetCommitSha?: string }>(ACTION_KEYS.triggerRollback, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkId: check.checkId,
+      rollbackType: "revert_commit",
+      targetCommitSha: "abc1234",
+      governanceNote: "Reverting the latest commit to restore service",
+      operatorAcknowledged: true,
+    });
+
+    expect(rollback.rollbackType).toBe("revert_commit");
+    expect(rollback.targetCommitSha).toBe("abc1234");
+  });
+
+  it("auto-resolves rollback requests from failed checks to the latest checkpoint", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertIdea(harness.ctx, createIdea({ ideaId: "idea-auto-rollback", status: "approved" }));
+    const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-auto-rollback",
+      artifactId: "artifact-auto-rollback",
+    });
+    await harness.performAction(ACTION_KEYS.resumeDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+    });
+    const checkpoint = await harness.performAction<{ checkpointId: string }>(ACTION_KEYS.createCheckpoint, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+    });
+    const check = await harness.performAction<{ checkId: string }>(ACTION_KEYS.createReleaseHealthCheck, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkType: "smoke_test",
+      name: "Smoke",
+    });
+    await harness.performAction(ACTION_KEYS.updateReleaseHealthStatus, {
+      companyId: "company-1",
+      projectId: "project-1",
+      checkId: check.checkId,
+      status: "failed",
+      errorMessage: "boom",
+    });
+
+    const rollback = await harness.performAction<{ rollbackType: string; checkpointId?: string }>(ACTION_KEYS.triggerRollback, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkId: check.checkId,
+    });
+
+    expect(rollback.rollbackType).toBe("restore_checkpoint");
+    expect(rollback.checkpointId).toBe(checkpoint.checkpointId);
+  });
+
+  it("closes rollback actions and pauses the run after a completed restore", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertIdea(harness.ctx, createIdea({ ideaId: "idea-rollback-close", status: "approved" }));
+    const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-rollback-close",
+      artifactId: "artifact-rollback-close",
+    });
+    await harness.performAction(ACTION_KEYS.resumeDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+    });
+    const checkpoint = await harness.performAction<{ checkpointId: string }>(ACTION_KEYS.createCheckpoint, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+    });
+    const check = await harness.performAction<{ checkId: string }>(ACTION_KEYS.createReleaseHealthCheck, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkType: "smoke_test",
+      name: "Smoke",
+    });
+    await harness.performAction(ACTION_KEYS.updateReleaseHealthStatus, {
+      companyId: "company-1",
+      projectId: "project-1",
+      checkId: check.checkId,
+      status: "failed",
+      errorMessage: "boom",
+    });
+    const rollback = await harness.performAction<{ rollbackId: string }>(ACTION_KEYS.triggerRollback, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkId: check.checkId,
+      rollbackType: "restore_checkpoint",
+      checkpointId: checkpoint.checkpointId,
+    });
+
+    const completed = await harness.performAction<{ status: string; completedAt?: string }>(ACTION_KEYS.updateRollbackStatus, {
+      companyId: "company-1",
+      projectId: "project-1",
+      rollbackId: rollback.rollbackId,
+      status: "completed",
+    });
+
+    const runs = await harness.ctx.entities.list({
+      entityType: ENTITY_TYPES.deliveryRun,
+      scopeKind: "project",
+      scopeId: "project-1",
+    });
+    const summaries = await harness.ctx.entities.list({
+      entityType: ENTITY_TYPES.learnerSummary,
+      scopeKind: "project",
+      scopeId: "project-1",
+    });
+    const knowledgeEntries = await harness.ctx.entities.list({
+      entityType: ENTITY_TYPES.knowledgeEntry,
+      scopeKind: "project",
+      scopeId: "project-1",
+    });
+    const updatedRun = runs.find((entity) => entity.data.runId === run.runId)?.data as { status: string; pauseReason?: string };
+    const summary = summaries.find((entity) => entity.data.runId === run.runId)?.data as {
+      summaryText: string;
+      keyLearnings: string[];
+      sourceRollbackId?: string;
+      sourceCheckId?: string;
+      sourceCheckpointId?: string;
+      sourceDigestId?: string;
+    };
+    const knowledge = knowledgeEntries.find((entity) => entity.data.sourceRunId === run.runId)?.data as {
+      title: string;
+      knowledgeType: string;
+      sourceSummaryId?: string;
+      sourceRollbackId?: string;
+      sourceCheckId?: string;
+      sourceCheckpointId?: string;
+      sourceDigestId?: string;
+    };
+
+    expect(completed.status).toBe("completed");
+    expect(completed.completedAt).toBeTruthy();
+    expect(updatedRun.status).toBe("paused");
+    expect(updatedRun.pauseReason).toContain("Rollback completed");
+    expect(summary.summaryText).toContain("recovery time");
+    expect(summary.keyLearnings.some((entry) => String(entry).includes("Failed check"))).toBe(true);
+    expect(summary.sourceRollbackId).toBe(rollback.rollbackId);
+    expect(summary.sourceCheckId).toBe(check.checkId);
+    expect(summary.sourceCheckpointId).toBe(checkpoint.checkpointId);
+    expect(summary.sourceDigestId).toBeTruthy();
+    expect(knowledge.title).toContain("Recovery procedure");
+    expect(knowledge.knowledgeType).toBe("procedure");
+    expect(knowledge.sourceSummaryId).toBeTruthy();
+    expect(knowledge.sourceRollbackId).toBe(rollback.rollbackId);
+    expect(knowledge.sourceCheckId).toBe(check.checkId);
+    expect(knowledge.sourceCheckpointId).toBe(checkpoint.checkpointId);
+    expect(knowledge.sourceDigestId).toBe(summary.sourceDigestId);
+  });
+
+  it("creates a digest automatically when a release health check fails", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    await upsertIdea(harness.ctx, createIdea({ ideaId: "idea-health-digest", status: "approved" }));
+    const run = await harness.performAction<{ runId: string }>(ACTION_KEYS.createDeliveryRun, {
+      companyId: "company-1",
+      projectId: "project-1",
+      ideaId: "idea-health-digest",
+      artifactId: "artifact-health-digest",
+    });
+    const check = await harness.performAction<{ checkId: string }>(ACTION_KEYS.createReleaseHealthCheck, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: run.runId,
+      checkType: "smoke_test",
+      name: "Smoke",
+    });
+
+    await harness.performAction(ACTION_KEYS.updateReleaseHealthStatus, {
+      companyId: "company-1",
+      projectId: "project-1",
+      checkId: check.checkId,
+      status: "failed",
+      errorMessage: "Homepage 500",
+    });
+
+    const digests = await harness.ctx.entities.list({
+      entityType: ENTITY_TYPES.digest,
+      scopeKind: "project",
+      scopeId: "project-1",
+    });
+    const healthDigest = digests.find((digest) => digest.data.digestType === "health_check_failed");
+
+    expect(healthDigest?.data.relatedRunId).toBe(run.runId);
+    expect(healthDigest?.data.urgency).toBe("blocking");
+  });
+
+  it("requires governance to release a merge lock", async () => {
+    await upsertAutopilotProject(harness.ctx, createProject());
+    const lock = await harness.performAction<{ lockId: string }>(ACTION_KEYS.acquireProductLock, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: "run-merge-release",
+      lockType: "merge_lock",
+      targetBranch: "main",
+      blockReason: "Holding the gate pending operator review",
+    });
+
+    expect(lock.lockId).toBeTruthy();
+
+    await expect(
+      harness.performAction(ACTION_KEYS.releaseProductLock, {
+        companyId: "company-1",
+        projectId: "project-1",
+        runId: "run-merge-release",
+      }),
+    ).rejects.toThrow("operator acknowledgment");
+
+    const released = await harness.performAction<{ isActive: boolean; releasedAt: string }>(ACTION_KEYS.releaseProductLock, {
+      companyId: "company-1",
+      projectId: "project-1",
+      runId: "run-merge-release",
+      governanceNote: "Deployment window cleared; releasing the gate",
+      operatorAcknowledged: true,
+    });
+
+    expect(released.isActive).toBe(false);
+    expect(released.releasedAt).toBeTruthy();
+  });
+
   it("dismisses digests through the digest state machine", async () => {
     await upsertAutopilotProject(harness.ctx, createProject());
     await upsertCompanyBudget(harness.ctx, createBudget());
@@ -859,6 +1219,7 @@ describe("worker integration", () => {
     expect(generatedIdea?.data.title).toContain("Improve onboarding completion");
     expect(generatedIdea?.data.sourceReferences).toEqual(["https://example.com/support"]);
     expect(generatedIdea?.data.rationale).toContain("outcomeBoost=");
+    expect(generatedIdea?.data.rankingExplanation?.provisionalExecutionMode).toBe("simple");
   });
 
   it("annotates duplicate research findings through the action path", async () => {

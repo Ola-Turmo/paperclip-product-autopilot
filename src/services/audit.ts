@@ -2,6 +2,8 @@ import type {
   Checkpoint,
   DeliveryRun,
   Digest,
+  KnowledgeEntry,
+  LearnerSummary,
   OperatorIntervention,
   ReleaseHealthCheck,
   RollbackAction,
@@ -23,6 +25,8 @@ export function buildRunAuditTimeline(input: {
   checkpoints: Checkpoint[];
   rollbacks: RollbackAction[];
   digests: Digest[];
+  summaries?: LearnerSummary[];
+  knowledgeEntries?: KnowledgeEntry[];
 }): AuditTimelineEvent[] {
   return [
     {
@@ -72,6 +76,28 @@ export function buildRunAuditTimeline(input: {
       title: `Digest: ${digest.digestType}`,
       detail: digest.summary,
       status: digest.status,
+    })),
+    ...(input.summaries ?? []).map((summary) => ({
+      id: summary.summaryId,
+      at: summary.createdAt,
+      title: `Summary: ${summary.title}`,
+      detail: [
+        summary.summaryText,
+        summary.sourceRollbackId ? `rollback ${summary.sourceRollbackId}` : undefined,
+        summary.sourceDigestId ? `digest ${summary.sourceDigestId}` : undefined,
+      ].filter(Boolean).join(" | "),
+      status: "completed",
+    })),
+    ...(input.knowledgeEntries ?? []).map((entry) => ({
+      id: entry.entryId,
+      at: entry.updatedAt,
+      title: `Knowledge: ${entry.title}`,
+      detail: [
+        entry.knowledgeType,
+        entry.sourceRollbackId ? `rollback ${entry.sourceRollbackId}` : undefined,
+        entry.sourceDigestId ? `digest ${entry.sourceDigestId}` : undefined,
+      ].filter(Boolean).join(" | "),
+      status: "active",
     })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 }

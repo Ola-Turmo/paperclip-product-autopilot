@@ -10,11 +10,18 @@ import type {
 import type { RunStatus } from "../constants.js";
 import { transitionRunStatus } from "./state-machines.js";
 
+type PlanningRiskLevel = NonNullable<PlanningArtifact["riskLevel"]>;
+type CancellationPolicy = NonNullable<PlanningArtifact["cancellationPolicy"]>;
+
 export function deriveCheckpointRequirement(input: {
   automationTier: AutomationTier;
   executionMode: "simple" | "convoy";
   complexityEstimate?: Idea["complexityEstimate"];
+  riskLevel?: PlanningRiskLevel;
 }): { required: boolean; reason?: string } {
+  if (input.riskLevel === "high") {
+    return { required: true, reason: "High-risk plans require a checkpoint before execution or cancellation." };
+  }
   if (input.executionMode === "convoy") {
     return { required: true, reason: "Convoy execution requires a checkpoint before risky multi-step delivery." };
   }
@@ -25,6 +32,88 @@ export function deriveCheckpointRequirement(input: {
     return { required: true, reason: "Fullauto runs require a checkpoint for operator-safe recovery." };
   }
   return { required: false, reason: undefined };
+}
+
+function deriveRiskFactors(input: {
+  automationTier: AutomationTier;
+  executionMode: "simple" | "convoy";
+  complexityEstimate?: Idea["complexityEstimate"];
+  dependencies?: string[];
+  risks?: string[];
+}): string[] {
+  const factors = new Set<string>();
+  if (input.executionMode === "convoy") factors.add("multi_step_execution");
+  if (input.automationTier === "fullauto") factors.add("autonomous_execution");
+  if (input.complexityEstimate === "high") factors.add("high_complexity");
+  if ((input.dependencies?.length ?? 0) > 0) factors.add("delivery_dependencies");
+  for (const risk of input.risks ?? []) {
+    const trimmed = risk.trim();
+    if (trimmed) factors.add(trimmed);
+  }
+  return [...factors];
+}
+
+function deriveRiskLevel(input: {
+  automationTier: AutomationTier;
+  executionMode: "simple" | "convoy";
+  complexityEstimate?: Idea["complexityEstimate"];
+  dependencies?: string[];
+  riskFactors: string[];
+}): PlanningRiskLevel {
+  if (
+    input.executionMode === "convoy" ||
+    input.automationTier === "fullauto" ||
+    input.complexityEstimate === "high" ||
+    input.riskFactors.length >= 3
+  ) {
+    return "high";
+  }
+  if (
+    input.automationTier === "semiauto" ||
+    input.complexityEstimate === "medium" ||
+    (input.dependencies?.length ?? 0) > 0 ||
+    input.riskFactors.length > 0
+  ) {
+    return "medium";
+  }
+  return "low";
+}
+
+function deriveRolloutGuardrails(input: {
+  executionMode: "simple" | "convoy";
+  automationTier: AutomationTier;
+  riskLevel: PlanningRiskLevel;
+}): string[] {
+  const guardrails = [
+    "Run release-health checks before marking the run complete",
+    "Keep rollback recovery available until the rollout is verified",
+  ];
+  if (input.executionMode === "convoy") {
+    guardrails.push("Advance convoy tasks in order and checkpoint before cross-cutting steps");
+  }
+  if (input.automationTier === "fullauto" || input.riskLevel === "high") {
+    guardrails.push("Require an operator-visible audit trail for any forced cancellation or rollback");
+  }
+  return guardrails;
+}
+
+function deriveCancellationPolicy(checkpointRequired: boolean): CancellationPolicy {
+  return checkpointRequired ? "checkpoint_or_acknowledged_force" : "operator_cancel";
+}
+
+function deriveApprovalMode(input: {
+  approvalMode?: "manual" | "auto_approve";
+  automationTier: AutomationTier;
+  executionMode: "simple" | "convoy";
+  complexityEstimate?: Idea["complexityEstimate"];
+  riskLevel: PlanningRiskLevel;
+}): "manual" | "auto_approve" {
+  if (input.approvalMode) return input.approvalMode;
+  if (input.automationTier !== "fullauto") return "manual";
+  if (input.executionMode === "convoy") return "manual";
+  if (input.complexityEstimate === "high") return "manual";
+  if (input.riskLevel === "high") return "manual";
+  return "auto_approve";
 }
 
 export function buildPlanningArtifact(input: {
@@ -46,10 +135,33 @@ export function buildPlanningArtifact(input: {
   approvalMode?: "manual" | "auto_approve";
 }): PlanningArtifact {
   const executionMode = input.executionMode ?? ((input.dependencies?.length ?? 0) > 0 ? "convoy" : "simple");
+  const riskFactors = deriveRiskFactors({
+    automationTier: input.automationTier,
+    executionMode,
+    complexityEstimate: input.idea.complexityEstimate,
+    dependencies: input.dependencies,
+    risks: input.idea.risks,
+  });
+  const riskLevel = deriveRiskLevel({
+    automationTier: input.automationTier,
+    executionMode,
+    complexityEstimate: input.idea.complexityEstimate,
+    dependencies: input.dependencies,
+    riskFactors,
+  });
   const checkpointPolicy = deriveCheckpointRequirement({
     automationTier: input.automationTier,
     executionMode,
     complexityEstimate: input.idea.complexityEstimate,
+    riskLevel,
+  });
+  const cancellationPolicy = deriveCancellationPolicy(checkpointPolicy.required);
+  const approvalMode = deriveApprovalMode({
+    approvalMode: input.approvalMode,
+    automationTier: input.automationTier,
+    executionMode,
+    complexityEstimate: input.idea.complexityEstimate,
+    riskLevel,
   });
   return {
     artifactId: input.artifactId,
@@ -72,11 +184,20 @@ export function buildPlanningArtifact(input: {
       input.approvalChecklist ?? [
         "Confirm implementation scope matches the idea rationale",
         "Confirm rollback and release-health checks are defined",
+        ...(checkpointPolicy.required ? ["Confirm a checkpoint strategy exists before risky execution"] : []),
       ],
     executionMode,
-    approvalMode: input.approvalMode ?? (input.automationTier === "fullauto" ? "auto_approve" : "manual"),
+    approvalMode,
     checkpointRequired: checkpointPolicy.required,
     checkpointReason: checkpointPolicy.reason,
+    riskLevel,
+    riskFactors,
+    rolloutGuardrails: deriveRolloutGuardrails({
+      executionMode,
+      automationTier: input.automationTier,
+      riskLevel,
+    }),
+    cancellationPolicy,
     automationTier: input.automationTier,
     status: "draft",
     createdAt: input.createdAt,
@@ -88,10 +209,14 @@ export function shouldCreateDeliveryRun(input: {
   decision: "pass" | "maybe" | "yes" | "now";
   autopilotEnabled: boolean;
   automationTier: AutomationTier;
+  approvalMode?: "manual" | "auto_approve";
 }): boolean {
   if (!input.autopilotEnabled) return false;
   if (input.decision === "now") return true;
-  return input.decision === "yes" && input.automationTier !== "supervised";
+  if (input.decision !== "yes") return false;
+  if (input.automationTier === "semiauto") return true;
+  if (input.automationTier === "fullauto") return input.approvalMode === "auto_approve";
+  return false;
 }
 
 export function buildPendingDeliveryRun(input: {
@@ -247,6 +372,28 @@ export function requiresCheckpointForRunGate(input: {
     satisfied,
     reason: input.artifact?.checkpointReason,
   };
+}
+
+export function getRunCancellationPolicy(
+  artifact?: PlanningArtifact | null,
+): {
+  policy: CancellationPolicy;
+  riskLevel: PlanningRiskLevel;
+  guardrails: string[];
+} {
+  return {
+    policy: artifact?.cancellationPolicy ?? (artifact?.checkpointRequired ? "checkpoint_or_acknowledged_force" : "operator_cancel"),
+    riskLevel: artifact?.riskLevel ?? (artifact?.checkpointRequired ? "high" : "medium"),
+    guardrails: artifact?.rolloutGuardrails ?? [],
+  };
+}
+
+export function describeCancellationPolicy(artifact?: PlanningArtifact | null): string {
+  const { policy } = getRunCancellationPolicy(artifact);
+  if (policy === "checkpoint_or_acknowledged_force") {
+    return "Checkpoint first, or use a force-cancel with explicit operator acknowledgment.";
+  }
+  return "Operator can cancel directly with a clear reason.";
 }
 
 export function releaseWorkspaceLease(lease: WorkspaceLease, releasedAt: string): WorkspaceLease {

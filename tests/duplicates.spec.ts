@@ -24,28 +24,69 @@ function createIdea(overrides: Partial<Idea> = {}): Idea {
 }
 
 describe("duplicate scoring", () => {
-  it("scores highly similar ideas above the duplicate threshold", () => {
-    const result = scoreIdeaDuplicateCandidate({
-      title: "Improve onboarding completion",
-      description: "Users drop before activation in onboarding flow",
-      category: "user_feedback",
-      tags: ["onboarding"],
-      sourceReferences: ["https://example.com/source"],
-    }, createIdea());
+  it("holds duplicate scoring stable across regression fixtures", () => {
+    const cases = [
+      {
+        caseId: "near-identical",
+        candidate: {
+          title: "Improve onboarding completion",
+          description: "Users drop before activation in onboarding flow",
+          category: "user_feedback",
+          tags: ["onboarding"],
+          sourceReferences: ["https://example.com/source"],
+        },
+        expectedMinSimilarity: 0.75,
+        expectedReasons: ["near-identical title", "shared source reference"],
+      },
+      {
+        caseId: "tag-and-category-overlapping",
+        candidate: {
+          title: "Improve onboarding flow completion",
+          description: "Activation drops during first-run onboarding",
+          category: "user_feedback",
+          tags: ["user_feedback", "onboarding"],
+          sourceReferences: [],
+        },
+        expectedMinSimilarity: 0.65,
+        expectedReasons: ["same category", "overlapping tags"],
+      },
+      {
+        caseId: "same-title-different-category",
+        candidate: {
+          title: "Improve onboarding completion",
+          description: "Marketing handoff is missing before demo signup",
+          category: "opportunity",
+          tags: ["sales"],
+          sourceReferences: [],
+        },
+        expectedMinSimilarity: 0.55,
+        expectedReasons: ["near-identical title"],
+      },
+      {
+        caseId: "unrelated",
+        candidate: {
+          title: "Reduce build pipeline latency",
+          description: "CI jobs are too slow for backend services",
+          category: "technical",
+          tags: ["infra"],
+          sourceReferences: ["https://example.com/ci"],
+        },
+        expectedMaxSimilarity: 0.5,
+        expectedReasons: [],
+      },
+    ] as const;
 
-    expect(result.similarity).toBeGreaterThan(0.75);
-    expect(result.reasons).toContain("near-identical title");
-  });
-
-  it("keeps unrelated ideas below the duplicate threshold", () => {
-    const result = scoreIdeaDuplicateCandidate({
-      title: "Reduce build pipeline latency",
-      description: "CI jobs are too slow for backend services",
-      category: "technical",
-      tags: ["infra"],
-      sourceReferences: ["https://example.com/ci"],
-    }, createIdea());
-
-    expect(result.similarity).toBeLessThan(0.5);
+    for (const testCase of cases) {
+      const result = scoreIdeaDuplicateCandidate(testCase.candidate, createIdea());
+      if ("expectedMinSimilarity" in testCase) {
+        expect(result.similarity, testCase.caseId).toBeGreaterThanOrEqual(testCase.expectedMinSimilarity);
+      }
+      if ("expectedMaxSimilarity" in testCase) {
+        expect(result.similarity, testCase.caseId).toBeLessThan(testCase.expectedMaxSimilarity);
+      }
+      for (const reason of testCase.expectedReasons) {
+        expect(result.reasons, testCase.caseId).toContain(reason);
+      }
+    }
   });
 });

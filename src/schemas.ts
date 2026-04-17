@@ -92,6 +92,9 @@ export const researchCycleSchema = z.object({
     findingIds: z.array(z.string()),
     topicCounts: z.record(z.number().int().nonnegative()),
     signalFamilyCounts: z.record(z.number().int().nonnegative()),
+    sourceTypeCounts: z.record(z.number().int().nonnegative()),
+    sourceScopeCounts: z.record(z.number().int().nonnegative()),
+    sourceDomainCounts: z.record(z.number().int().nonnegative()),
     averageFreshnessScore: z.number().min(0).max(100),
     averageSourceQualityScore: z.number().min(0).max(100),
     duplicateCount: z.number().int().nonnegative(),
@@ -115,6 +118,9 @@ export const researchFindingSchema = z.object({
   sourceId: z.string().optional(),
   sourceTimestamp: z.string().optional(),
   ingestedAt: z.string().optional(),
+  sourceDomain: z.string().optional(),
+  sourceScope: z.enum(["internal", "customer", "external"]).optional(),
+  normalizedSourceKey: z.string().optional(),
   evidenceText: z.string().optional(),
   signalFamily: signalFamilySchema.optional(),
   topic: z.string().optional(),
@@ -133,6 +139,12 @@ export const researchFindingSchema = z.object({
   if (finding.sourceType && !finding.ingestedAt) {
     ctx.addIssue({ code: "custom", message: "typed research findings must include ingestedAt", path: ["ingestedAt"] });
   }
+  if (finding.sourceUrl && !finding.sourceDomain) {
+    ctx.addIssue({ code: "custom", message: "research findings with sourceUrl must include sourceDomain", path: ["sourceDomain"] });
+  }
+  if (finding.sourceType && !finding.normalizedSourceKey) {
+    ctx.addIssue({ code: "custom", message: "typed research findings must include normalizedSourceKey", path: ["normalizedSourceKey"] });
+  }
 });
 
 export const ideaSchema = z.object({
@@ -149,6 +161,23 @@ export const ideaSchema = z.object({
   complexityEstimate: complexitySchema.optional(),
   technicalApproach: z.string().optional(),
   risks: z.array(z.string()).optional(),
+  rankingExplanation: z.object({
+    rankingScore: z.number(),
+    impactScore: z.number(),
+    feasibilityScore: z.number(),
+    category: z.string().optional(),
+    confidence: z.number().min(0).max(1),
+    freshnessScore: z.number().min(0).max(100),
+    sourceQualityScore: z.number().min(0).max(100),
+    complexityEstimate: complexitySchema,
+    provisionalExecutionMode: executionModeSchema,
+    preferenceBoost: z.number(),
+    complexityPreferenceBoost: z.number(),
+    executionModePreferenceBoost: z.number(),
+    researchQualityBoost: z.number(),
+    outcomeBoost: z.number(),
+    outcomeEvidenceCount: z.number().int().nonnegative(),
+  }).optional(),
   category: z.string().optional(),
   tags: z.array(z.string()).optional(),
   status: ideaStatusSchema,
@@ -187,6 +216,7 @@ export const preferenceProfileSchema = z.object({
   categoryPreferences: z.record(swipeBreakdownSchema),
   tagPreferences: z.record(swipeBreakdownSchema),
   complexityPreferences: z.record(swipeBreakdownSchema),
+  executionModePreferences: z.record(swipeBreakdownSchema),
   avgApprovedScore: z.number(),
   avgRejectedScore: z.number(),
   lastUpdated: z.string().min(1),
@@ -208,6 +238,10 @@ export const planningArtifactSchema = z.object({
   approvalMode: approvalModeSchema,
   checkpointRequired: z.boolean(),
   checkpointReason: z.string().optional(),
+  riskLevel: z.enum(["low", "medium", "high"]).optional(),
+  riskFactors: z.array(z.string()).optional(),
+  rolloutGuardrails: z.array(z.string()).optional(),
+  cancellationPolicy: z.enum(["operator_cancel", "checkpoint_or_acknowledged_force"]).optional(),
   automationTier: automationTierSchema,
   status: z.enum(["draft", "approved", "in_progress", "completed", "cancelled"]),
   createdAt: z.string().min(1),
@@ -215,6 +249,23 @@ export const planningArtifactSchema = z.object({
 }).superRefine((artifact, ctx) => {
   if (artifact.checkpointRequired && !artifact.checkpointReason) {
     ctx.addIssue({ code: "custom", message: "checkpoint-required plans must include checkpointReason", path: ["checkpointReason"] });
+  }
+  if (artifact.riskLevel === "high" && !artifact.checkpointRequired) {
+    ctx.addIssue({ code: "custom", message: "high-risk plans must require a checkpoint", path: ["checkpointRequired"] });
+  }
+  if (
+    artifact.checkpointRequired &&
+    artifact.cancellationPolicy &&
+    artifact.cancellationPolicy !== "checkpoint_or_acknowledged_force"
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      message: "checkpoint-required plans must use checkpoint_or_acknowledged_force cancellation",
+      path: ["cancellationPolicy"],
+    });
+  }
+  if (artifact.rolloutGuardrails?.some((guardrail) => !guardrail.trim())) {
+    ctx.addIssue({ code: "custom", message: "rollout guardrails cannot be blank", path: ["rolloutGuardrails"] });
   }
 });
 
@@ -391,6 +442,10 @@ export const learnerSummarySchema = z.object({
   projectId: z.string().min(1),
   runId: z.string().min(1),
   ideaId: z.string().min(1),
+  sourceRollbackId: z.string().optional(),
+  sourceCheckId: z.string().optional(),
+  sourceCheckpointId: z.string().optional(),
+  sourceDigestId: z.string().optional(),
   title: z.string().min(1),
   summaryText: z.string().min(1),
   keyLearnings: z.array(z.string()),
@@ -415,6 +470,10 @@ export const knowledgeEntrySchema = z.object({
   reinjectionCommand: z.string().optional(),
   sourceRunId: z.string().optional(),
   sourceSummaryId: z.string().optional(),
+  sourceRollbackId: z.string().optional(),
+  sourceCheckId: z.string().optional(),
+  sourceCheckpointId: z.string().optional(),
+  sourceDigestId: z.string().optional(),
   usedInRunId: z.string().optional(),
   lastUsedAt: z.string().optional(),
   usageCount: z.number().int().nonnegative(),

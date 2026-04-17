@@ -1,4 +1,4 @@
-import type { Idea, PreferenceProfile, ResearchFinding } from "../types.js";
+import type { Idea, IdeaRankingExplanation, PreferenceProfile, ResearchFinding } from "../types.js";
 import {
   computeOutcomeBoost,
   type OutcomePreferenceSignals,
@@ -74,6 +74,19 @@ function computeComplexityPreferenceBoost(
   return ((positive - negative) / total) * 6;
 }
 
+function computeExecutionModePreferenceBoost(
+  profile: PreferenceProfile | null | undefined,
+  executionMode: "simple" | "convoy",
+): number {
+  const stats = profile?.executionModePreferences?.[executionMode];
+  if (!stats) return 0;
+  const positive = stats.yes + stats.now;
+  const negative = stats.pass;
+  const total = positive + negative + stats.maybe;
+  if (total === 0) return 0;
+  return ((positive - negative) / total) * 5;
+}
+
 function computeResearchQualityBoost(finding: ResearchFinding): number {
   const freshnessBoost = ((finding.freshnessScore ?? 50) - 50) / 8;
   const sourceQualityBoost = ((finding.sourceQualityScore ?? 50) - 50) / 10;
@@ -96,6 +109,7 @@ export function scoreFindingForIdea(
   feasibilityScore: number;
   rankingScore: number;
   explanation: string;
+  rankingExplanation: IdeaRankingExplanation;
 } {
   const confidenceBoost = (finding.confidence - 0.5) * 24;
   const preferenceBoost = computePreferenceBoost(profile, finding.category);
@@ -105,6 +119,7 @@ export function scoreFindingForIdea(
     categoryBaseFeasibility(finding.category) + confidenceBoost / 2 >= 56 ? "medium" : "high";
   const executionMode = provisionalComplexity === "high" ? "convoy" : "simple";
   const complexityPreferenceBoost = computeComplexityPreferenceBoost(profile, provisionalComplexity);
+  const executionModePreferenceBoost = computeExecutionModePreferenceBoost(profile, executionMode);
   const outcomeBoost = computeOutcomeBoost({
     signals: outcomeSignals,
     category: finding.category,
@@ -118,6 +133,7 @@ export function scoreFindingForIdea(
       confidenceBoost +
       preferenceBoost +
       complexityPreferenceBoost +
+      executionModePreferenceBoost +
       researchQualityBoost +
       outcomeBoost.boost,
   );
@@ -126,6 +142,7 @@ export function scoreFindingForIdea(
       confidenceBoost / 2 +
       preferenceBoost / 2 +
       complexityPreferenceBoost / 2 +
+      executionModePreferenceBoost / 2 +
       researchQualityBoost / 2 +
       outcomeBoost.boost / 2,
   );
@@ -139,6 +156,7 @@ export function scoreFindingForIdea(
     `complexity=${provisionalComplexity}`,
     `complexityPreferenceBoost=${complexityPreferenceBoost.toFixed(1)}`,
     `executionMode=${executionMode}`,
+    `executionModePreferenceBoost=${executionModePreferenceBoost.toFixed(1)}`,
     `researchQualityBoost=${researchQualityBoost.toFixed(1)}`,
     `outcomeBoost=${outcomeBoost.boost.toFixed(1)}`,
     `outcomeEvidence=${outcomeBoost.evidenceCount}`,
@@ -146,14 +164,36 @@ export function scoreFindingForIdea(
     `feasibility=${feasibilityScore}`,
   ].join(", ");
 
-  return { impactScore, feasibilityScore, rankingScore, explanation };
+  return {
+    impactScore,
+    feasibilityScore,
+    rankingScore,
+    explanation,
+    rankingExplanation: {
+      rankingScore,
+      impactScore,
+      feasibilityScore,
+      category: finding.category,
+      confidence: finding.confidence,
+      freshnessScore: finding.freshnessScore,
+      sourceQualityScore: finding.sourceQualityScore,
+      complexityEstimate: provisionalComplexity,
+      provisionalExecutionMode: executionMode,
+      preferenceBoost: Number(preferenceBoost.toFixed(1)),
+      complexityPreferenceBoost: Number(complexityPreferenceBoost.toFixed(1)),
+      executionModePreferenceBoost: Number(executionModePreferenceBoost.toFixed(1)),
+      researchQualityBoost: Number(researchQualityBoost.toFixed(1)),
+      outcomeBoost: Number(outcomeBoost.boost.toFixed(1)),
+      outcomeEvidenceCount: outcomeBoost.evidenceCount,
+    },
+  };
 }
 
 export function rankFindingsForIdeation(
   findings: ResearchFinding[],
   profile?: PreferenceProfile | null,
   outcomeSignals?: OutcomePreferenceSignals | null,
-): Array<ResearchFinding & { rankingScore: number; impactScore: number; feasibilityScore: number; explanation: string }> {
+): Array<ResearchFinding & { rankingScore: number; impactScore: number; feasibilityScore: number; explanation: string; rankingExplanation: IdeaRankingExplanation }> {
   return findings
     .filter((finding) => !finding.duplicateAnnotated)
     .map((finding) => ({
@@ -191,10 +231,9 @@ export function buildIdeaDraftFromFinding(input: {
     sourceReferences: input.finding.sourceUrl ? [input.finding.sourceUrl] : [],
     impactScore: scored.impactScore,
     feasibilityScore: scored.feasibilityScore,
-    complexityEstimate:
-      scored.feasibilityScore >= 72 ? "low" :
-      scored.feasibilityScore >= 58 ? "medium" : "high",
+    complexityEstimate: scored.rankingExplanation.complexityEstimate,
     technicalApproach: input.finding.evidenceText,
+    rankingExplanation: scored.rankingExplanation,
     category: input.finding.category ?? "general",
     tags: input.finding.category ? [input.finding.category] : [],
     status: "active",

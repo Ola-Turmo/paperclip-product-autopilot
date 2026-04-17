@@ -47,6 +47,7 @@ export function createEmptyPreferenceProfile(input: {
     categoryPreferences: {},
     tagPreferences: {},
     complexityPreferences: {},
+    executionModePreferences: {},
     avgApprovedScore: 0,
     avgRejectedScore: 0,
     lastUpdated: input.lastUpdated,

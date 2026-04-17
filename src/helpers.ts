@@ -907,7 +907,8 @@ export async function upsertLearnerSummary(
 export async function listLearnerSummaries(
   ctx: PluginContext,
   companyId: string,
-  projectId: string
+  projectId: string,
+  runId?: string
 ): Promise<LearnerSummary[]> {
   const entities = await ctx.entities.list({
     entityType: ENTITY_TYPES.learnerSummary,
@@ -916,7 +917,11 @@ export async function listLearnerSummaries(
     limit: 200,
   });
   return entities
-    .filter((e) => asLearnerSummary(e).companyId === companyId)
+    .filter(
+      (e) =>
+        asLearnerSummary(e).companyId === companyId &&
+        (!runId || asLearnerSummary(e).runId === runId)
+    )
     .map(asLearnerSummary);
 }
 
@@ -940,7 +945,11 @@ export async function upsertKnowledgeEntry(
 export async function listKnowledgeEntries(
   ctx: PluginContext,
   companyId: string,
-  projectId: string
+  projectId: string,
+  filters?: {
+    sourceRunId?: string;
+    sourceSummaryId?: string;
+  }
 ): Promise<KnowledgeEntry[]> {
   const entities = await ctx.entities.list({
     entityType: ENTITY_TYPES.knowledgeEntry,
@@ -949,7 +958,12 @@ export async function listKnowledgeEntries(
     limit: 500,
   });
   return entities
-    .filter((e) => asKnowledgeEntry(e).companyId === companyId)
+    .filter(
+      (e) =>
+        asKnowledgeEntry(e).companyId === companyId &&
+        (!filters?.sourceRunId || asKnowledgeEntry(e).sourceRunId === filters.sourceRunId) &&
+        (!filters?.sourceSummaryId || asKnowledgeEntry(e).sourceSummaryId === filters.sourceSummaryId)
+    )
     .map(asKnowledgeEntry);
 }
 
@@ -1083,6 +1097,11 @@ export function newId(): string {
 
 // ─── Preference profile update ─────────────────────────────────────────────────
 // Merge a new swipe into the preference profile
+function deriveExecutionModePreferenceKey(idea: Idea): "simple" | "convoy" {
+  return idea.rankingExplanation?.provisionalExecutionMode ??
+    (idea.complexityEstimate === "high" ? "convoy" : "simple");
+}
+
 export function applySwipeToPreferenceProfile(
   profile: PreferenceProfile,
   decision: SwipeDecision,
@@ -1136,6 +1155,12 @@ export function applySwipeToPreferenceProfile(
     }
     updated.complexityPreferences[idea.complexityEstimate][decision] += 1;
   }
+
+  const executionMode = deriveExecutionModePreferenceKey(idea);
+  if (!updated.executionModePreferences[executionMode]) {
+    updated.executionModePreferences[executionMode] = { pass: 0, maybe: 0, yes: 0, now: 0 };
+  }
+  updated.executionModePreferences[executionMode][decision] += 1;
 
   updated.lastUpdated = nowIso();
   return updated;

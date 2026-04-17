@@ -7,6 +7,8 @@ import type {
   CompanyBudget,
   DeliveryRun,
   Idea,
+  KnowledgeEntry,
+  LearnerSummary,
   ProductLock,
   ProductProgramRevision,
   ResearchCycle,
@@ -157,6 +159,11 @@ function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFindin
     description: "Users drop before activation",
     sourceUrl: "https://support.example.com/tickets/123",
     sourceLabel: "support-ticket",
+    sourceType: "support_ticket",
+    ingestedAt: "2026-01-01T00:05:00.000Z",
+    sourceDomain: "support.example.com",
+    sourceScope: "customer",
+    normalizedSourceKey: "support_ticket:support.example.com",
     confidence: 0.9,
     category: "user_feedback",
     signalFamily: "support",
@@ -202,6 +209,41 @@ function createPlanningArtifact(overrides: Partial<PlanningArtifact> = {}): Plan
     status: "draft",
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function createLearnerSummary(overrides: Partial<LearnerSummary> = {}): LearnerSummary {
+  return {
+    summaryId: "summary-1",
+    companyId: "company-1",
+    projectId: "project-1",
+    runId: "run-1",
+    ideaId: "idea-1",
+    title: "Rollback recovery",
+    summaryText: "Summary text",
+    keyLearnings: ["Failed check: Smoke"],
+    skillsReinjected: ["checkpoint restore"],
+    metrics: { duration: 300000 },
+    createdAt: "2026-01-01T00:12:00.000Z",
+    ...overrides,
+  };
+}
+
+function createKnowledgeEntry(overrides: Partial<KnowledgeEntry> = {}): KnowledgeEntry {
+  return {
+    entryId: "knowledge-1",
+    companyId: "company-1",
+    projectId: "project-1",
+    knowledgeType: "procedure",
+    title: "Recovery procedure",
+    content: "Run: Recover rollout",
+    sourceRunId: "run-1",
+    sourceSummaryId: "summary-1",
+    usageCount: 0,
+    tags: ["rollback"],
+    createdAt: "2026-01-01T00:12:00.000Z",
+    updatedAt: "2026-01-01T00:12:00.000Z",
     ...overrides,
   };
 }
@@ -317,5 +359,24 @@ describe("autopilot repository", () => {
     expect(events[0]?.swipeId).toBe("swipe-1");
     expect(artifact?.artifactId).toBe("artifact-1");
     expect(artifacts).toHaveLength(1);
+  });
+
+  it("filters learner summaries and knowledge entries by run-linked provenance", async () => {
+    const repo = createAutopilotRepository(harness.ctx);
+    await repo.upsertLearnerSummary(createLearnerSummary({ summaryId: "summary-1", runId: "run-1" }));
+    await repo.upsertLearnerSummary(createLearnerSummary({ summaryId: "summary-2", runId: "run-2" }));
+    await repo.upsertKnowledgeEntry(createKnowledgeEntry({ entryId: "knowledge-1", sourceRunId: "run-1", sourceSummaryId: "summary-1" }));
+    await repo.upsertKnowledgeEntry(createKnowledgeEntry({ entryId: "knowledge-2", sourceRunId: "run-2", sourceSummaryId: "summary-2" }));
+
+    const runOneSummaries = await repo.listLearnerSummaries("company-1", "project-1", "run-1");
+    const runOneKnowledge = await repo.listKnowledgeEntries("company-1", "project-1", { sourceRunId: "run-1" });
+    const summaryTwoKnowledge = await repo.listKnowledgeEntries("company-1", "project-1", { sourceSummaryId: "summary-2" });
+
+    expect(runOneSummaries).toHaveLength(1);
+    expect(runOneSummaries[0]?.summaryId).toBe("summary-1");
+    expect(runOneKnowledge).toHaveLength(1);
+    expect(runOneKnowledge[0]?.entryId).toBe("knowledge-1");
+    expect(summaryTwoKnowledge).toHaveLength(1);
+    expect(summaryTwoKnowledge[0]?.entryId).toBe("knowledge-2");
   });
 });

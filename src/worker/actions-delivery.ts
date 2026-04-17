@@ -34,7 +34,12 @@ import {
   updateDeliveryRunStatus,
 } from "../services/delivery.js";
 import { requireGovernancePolicy } from "../services/governance.js";
-import { validateConvoyDependencies, validateDeliveryRunCreation, validatePlanningArtifactInvariant } from "../services/invariants.js";
+import {
+  validateConvoyDependencies,
+  validateDeliveryRunCancellation,
+  validateDeliveryRunCreation,
+  validatePlanningArtifactInvariant,
+} from "../services/invariants.js";
 import { recordAutopilotDurationMetric, recordAutopilotEvent } from "../services/observability.js";
 import { shouldPauseForBudget } from "../services/policy.js";
 import { transitionConvoyTask } from "../services/state-machines.js";
@@ -113,6 +118,9 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
     const activeLock = await repo.getActiveProductLock(a.projectId, branchName);
     const port = allocatePort();
     const createdAt = nowIso();
+    const artifact = a.artifactId
+      ? await repo.getPlanningArtifact(a.companyId, a.projectId, a.artifactId)
+      : null;
 
     const run = buildPendingDeliveryRun({
       runId,
@@ -132,6 +140,7 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
       run,
       ideaStatus: idea.status,
       activeLock,
+      artifact,
     });
     await repo.upsertDeliveryRun(run);
 
@@ -241,11 +250,36 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
   });
 
   ctx.actions.register(ACTION_KEYS.cancelDeliveryRun, async (args) => {
-    const a = args as { companyId: string; projectId: string; runId: string; reason?: string };
+    const a = args as {
+      companyId: string;
+      projectId: string;
+      runId: string;
+      reason?: string;
+      force?: boolean;
+      operatorAcknowledged?: boolean;
+    };
     const run = await repo.getDeliveryRun(a.companyId, a.projectId, a.runId);
     if (!run) throw new Error("Delivery run not found");
+    const artifact = run.artifactId
+      ? await repo.getPlanningArtifact(a.companyId, a.projectId, run.artifactId)
+      : null;
+    const checkpoints = await repo.listCheckpoints(a.companyId, a.projectId, a.runId);
+    validateDeliveryRunCancellation({
+      run,
+      artifact,
+      checkpoints,
+      reason: a.reason,
+      force: a.force,
+    });
+    if (a.force) {
+      requireGovernancePolicy({
+        action: "force_cancel_run",
+        governanceNote: a.reason,
+        operatorAcknowledged: a.operatorAcknowledged,
+      });
+    }
     const timestamp = nowIso();
-    const updated = buildCancelledRun(run, timestamp, a.reason ?? "Cancelled by operator");
+    const updated = buildCancelledRun(run, timestamp, a.reason!.trim());
     await repo.upsertDeliveryRun(updated);
 
     const lease = await repo.getActiveWorkspaceLease(a.projectId, a.runId);
@@ -423,11 +457,25 @@ export function registerDeliveryActionHandlers(ctx: PluginContext) {
   });
 
   ctx.actions.register(ACTION_KEYS.releaseProductLock, async (args) => {
-    const a = args as { companyId: string; projectId: string; runId: string };
+    const a = args as {
+      companyId: string;
+      projectId: string;
+      runId: string;
+      governanceNote?: string;
+      operatorAcknowledged?: boolean;
+    };
     const locks = await repo.listProductLocks(a.companyId, a.projectId);
     const lock = locks.find((candidate) => candidate.runId === a.runId && candidate.isActive);
     if (!lock) throw new Error("No active lock found for this run");
-    await repo.upsertProductLock({ ...lock, isActive: false, releasedAt: nowIso() });
-    return lock;
+    if (lock.lockType === "merge_lock") {
+      requireGovernancePolicy({
+        action: "release_merge_lock",
+        governanceNote: a.governanceNote,
+        operatorAcknowledged: a.operatorAcknowledged,
+      });
+    }
+    const updated = { ...lock, isActive: false, releasedAt: nowIso() };
+    await repo.upsertProductLock(updated);
+    return updated;
   });
 }

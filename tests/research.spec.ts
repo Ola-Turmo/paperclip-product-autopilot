@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { ResearchFinding } from "../src/types.js";
 import {
+  buildNormalizedSourceKey,
   computeFindingFreshnessScore,
   computeSourceQualityScore,
   createResearchFindingRecord,
   findDuplicateResearchFinding,
+  inferSourceScope,
+  normalizeSourceDomain,
   normalizeResearchSignalInput,
 } from "../src/services/research.js";
 
@@ -18,6 +21,11 @@ function createFinding(overrides: Partial<ResearchFinding> = {}): ResearchFindin
     description: "Users drop before activation",
     sourceUrl: "https://support.example.com/tickets/123",
     sourceLabel: "support-ticket",
+    sourceType: "support_ticket",
+    ingestedAt: "2026-01-01T00:05:00.000Z",
+    sourceDomain: "support.example.com",
+    sourceScope: "customer",
+    normalizedSourceKey: "support_ticket:support.example.com",
     category: "user_feedback",
     confidence: 0.92,
     signalFamily: "support",
@@ -51,6 +59,9 @@ describe("research service", () => {
     expect(finding.signalFamily).toBe("support");
     expect(finding.sourceType).toBe("support_ticket");
     expect(finding.ingestedAt).toBeTruthy();
+    expect(finding.sourceDomain).toBe("support.example.com");
+    expect(finding.sourceScope).toBe("customer");
+    expect(finding.normalizedSourceKey).toContain("support_ticket:");
     expect(finding.topic).toContain("onboarding");
     expect(finding.sourceQualityScore).toBeGreaterThan(50);
     expect(finding.freshnessScore).toBeGreaterThan(50);
@@ -82,6 +93,23 @@ describe("research service", () => {
     expect(normalized.sourceType).toBe("analytics_report");
     expect(normalized.sourceLabel).toContain("analytics");
     expect(normalized.ingestedAt).toBeTruthy();
+  });
+
+  it("normalizes source domain, scope, and keys consistently", () => {
+    expect(normalizeSourceDomain("https://www.github.com/example/repo/issues/1")).toBe("github.com");
+    expect(
+      inferSourceScope({
+        sourceType: "support_ticket",
+        sourceUrl: "https://support.example.com/ticket/1",
+        sourceLabel: "support ticket",
+      }),
+    ).toBe("customer");
+    expect(
+      buildNormalizedSourceKey({
+        sourceType: "analytics_report",
+        sourceDomain: "analytics.example.com",
+      }),
+    ).toBe("analytics_report:analytics.example.com");
   });
 
   it("detects duplicate findings from normalized topic/title similarity", () => {

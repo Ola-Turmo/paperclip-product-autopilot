@@ -30,12 +30,26 @@ export function validatePlanningArtifactInvariant(artifact: PlanningArtifact): v
   if (artifact.checkpointRequired && !artifact.checkpointReason?.trim()) {
     throw new Error("Checkpoint-required plans must include checkpointReason");
   }
+  if (artifact.riskLevel === "high" && !artifact.checkpointRequired) {
+    throw new Error("High-risk plans must require a checkpoint");
+  }
+  if (
+    artifact.checkpointRequired &&
+    artifact.cancellationPolicy &&
+    artifact.cancellationPolicy !== "checkpoint_or_acknowledged_force"
+  ) {
+    throw new Error("Checkpoint-required plans must use checkpoint_or_acknowledged_force cancellation");
+  }
+  if (artifact.riskLevel === "high" && (artifact.rolloutGuardrails?.length ?? 0) === 0) {
+    throw new Error("High-risk plans require rollout guardrails");
+  }
 }
 
 export function validateDeliveryRunCreation(input: {
   run: Pick<DeliveryRun, "artifactId" | "branchName" | "workspacePath" | "ideaId">;
   ideaStatus: string;
   activeLock: ProductLock | null;
+  artifact?: Pick<PlanningArtifact, "artifactId" | "ideaId" | "status"> | null;
 }): void {
   if (input.ideaStatus !== "approved" && input.ideaStatus !== "in_progress") {
     throw new Error(`Delivery run requires an approved idea, got ${input.ideaStatus}`);
@@ -51,6 +65,38 @@ export function validateDeliveryRunCreation(input: {
   }
   if (input.activeLock?.isActive) {
     throw new Error(`Branch ${input.run.branchName} is already locked`);
+  }
+  if (input.artifact) {
+    if (input.artifact.ideaId !== input.run.ideaId) {
+      throw new Error("Delivery run artifact does not belong to the target idea");
+    }
+    if (input.artifact.status === "cancelled") {
+      throw new Error("Cannot create a delivery run from a cancelled planning artifact");
+    }
+  }
+}
+
+export function validateDeliveryRunCancellation(input: {
+  run: Pick<DeliveryRun, "status">;
+  artifact?: Pick<PlanningArtifact, "cancellationPolicy"> | null;
+  checkpoints?: { checkpointId: string }[];
+  reason?: string;
+  force?: boolean;
+}): void {
+  if (!input.reason?.trim()) {
+    throw new Error("Cancellation reason is required");
+  }
+  if (!["pending", "running", "paused"].includes(input.run.status)) {
+    throw new Error(`Cannot cancel a run in status ${input.run.status}`);
+  }
+  const policy = input.artifact?.cancellationPolicy ?? "operator_cancel";
+  if (
+    policy === "checkpoint_or_acknowledged_force" &&
+    ["running", "paused"].includes(input.run.status) &&
+    (input.checkpoints?.length ?? 0) === 0 &&
+    !input.force
+  ) {
+    throw new Error("This run requires a checkpoint before cancellation unless the operator uses an acknowledged force-cancel");
   }
 }
 

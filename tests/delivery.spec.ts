@@ -68,6 +68,8 @@ describe("delivery services", () => {
     expect(artifact.approvalMode).toBe("manual");
     expect(artifact.implementationSpec).toBe("Ship better UX copy");
     expect(artifact.checkpointRequired).toBe(false);
+    expect(artifact.riskLevel).toBe("medium");
+    expect(artifact.cancellationPolicy).toBe("operator_cancel");
   });
 
   it("marks checkpoints required for convoy or fullauto plans", () => {
@@ -92,15 +94,19 @@ describe("delivery services", () => {
     });
 
     expect(convoyArtifact.checkpointRequired).toBe(true);
-    expect(convoyArtifact.checkpointReason).toContain("Convoy");
+    expect(convoyArtifact.checkpointReason).toContain("checkpoint");
     expect(fullautoArtifact.checkpointRequired).toBe(true);
+    expect(convoyArtifact.cancellationPolicy).toBe("checkpoint_or_acknowledged_force");
+    expect(fullautoArtifact.approvalMode).toBe("manual");
   });
 
   it("decides correctly when delivery should start from a swipe", () => {
     expect(shouldCreateDeliveryRun({ decision: "now", autopilotEnabled: true, automationTier: "supervised" })).toBe(true);
-    expect(shouldCreateDeliveryRun({ decision: "yes", autopilotEnabled: true, automationTier: "semiauto" })).toBe(true);
-    expect(shouldCreateDeliveryRun({ decision: "yes", autopilotEnabled: true, automationTier: "supervised" })).toBe(false);
-    expect(shouldCreateDeliveryRun({ decision: "yes", autopilotEnabled: false, automationTier: "fullauto" })).toBe(false);
+    expect(shouldCreateDeliveryRun({ decision: "yes", autopilotEnabled: true, automationTier: "semiauto", approvalMode: "auto_approve" })).toBe(true);
+    expect(shouldCreateDeliveryRun({ decision: "yes", autopilotEnabled: true, automationTier: "semiauto", approvalMode: "manual" })).toBe(true);
+    expect(shouldCreateDeliveryRun({ decision: "yes", autopilotEnabled: true, automationTier: "supervised", approvalMode: "auto_approve" })).toBe(false);
+    expect(shouldCreateDeliveryRun({ decision: "yes", autopilotEnabled: true, automationTier: "fullauto", approvalMode: "manual" })).toBe(false);
+    expect(shouldCreateDeliveryRun({ decision: "yes", autopilotEnabled: false, automationTier: "fullauto", approvalMode: "auto_approve" })).toBe(false);
   });
 
   it("builds pending runs, workspace leases, and product locks", () => {

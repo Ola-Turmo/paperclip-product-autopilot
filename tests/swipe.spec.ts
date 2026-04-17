@@ -60,6 +60,7 @@ describe("swipe services", () => {
     expect(swipe.ideaId).toBe("idea-1");
     expect(profile.totalSwipes).toBe(0);
     expect(profile.categoryPreferences).toEqual({});
+    expect(profile.executionModePreferences).toEqual({});
   });
 });
 

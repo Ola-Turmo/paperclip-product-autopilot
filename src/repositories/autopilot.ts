@@ -127,11 +127,18 @@ export interface AutopilotRepository {
   upsertCompanyBudget(budget: CompanyBudget): Promise<void>;
   listDigests(companyId: string, projectId: string): Promise<Digest[]>;
   upsertDigest(digest: Digest): Promise<void>;
-  listLearnerSummaries(companyId: string, projectId: string): Promise<LearnerSummary[]>;
+  listLearnerSummaries(companyId: string, projectId: string, runId?: string): Promise<LearnerSummary[]>;
   upsertLearnerSummary(summary: LearnerSummary): Promise<void>;
   upsertKnowledgeEntry(entry: KnowledgeEntry): Promise<void>;
   upsertOperatorIntervention(intervention: OperatorIntervention): Promise<void>;
-  listKnowledgeEntries(companyId: string, projectId: string): Promise<KnowledgeEntry[]>;
+  listKnowledgeEntries(
+    companyId: string,
+    projectId: string,
+    filters?: {
+      sourceRunId?: string;
+      sourceSummaryId?: string;
+    },
+  ): Promise<KnowledgeEntry[]>;
   listOperatorInterventions(companyId: string, projectId: string, runId?: string): Promise<OperatorIntervention[]>;
   listStuckRuns(companyId: string, projectId: string): Promise<DeliveryRun[]>;
   listCheckpoints(companyId: string, projectId: string, runId?: string): Promise<Checkpoint[]>;
@@ -214,7 +221,7 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
     upsertDigest: async (digest) => {
       await upsertDigest(ctx, digest);
     },
-    listLearnerSummaries: (companyId, projectId) => listLearnerSummaries(ctx, companyId, projectId),
+    listLearnerSummaries: (companyId, projectId, runId) => listLearnerSummaries(ctx, companyId, projectId, runId),
     upsertLearnerSummary: async (summary) => {
       await upsertLearnerSummary(ctx, summary);
     },
@@ -224,7 +231,7 @@ export function createAutopilotRepository(ctx: PluginContext): AutopilotReposito
     upsertOperatorIntervention: async (intervention) => {
       await upsertOperatorIntervention(ctx, intervention);
     },
-    listKnowledgeEntries: (companyId, projectId) => listKnowledgeEntries(ctx, companyId, projectId),
+    listKnowledgeEntries: (companyId, projectId, filters) => listKnowledgeEntries(ctx, companyId, projectId, filters),
     listOperatorInterventions: (companyId, projectId, runId) => listOperatorInterventions(ctx, companyId, projectId, runId),
     listStuckRuns: (companyId, projectId) => listStuckRuns(ctx, companyId, projectId),
     listCheckpoints: (companyId, projectId, runId) => listCheckpoints(ctx, companyId, projectId, runId),

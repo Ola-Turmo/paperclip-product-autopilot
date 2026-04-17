@@ -1,5 +1,6 @@
 import type { PluginContext } from "@paperclipai/plugin-sdk";
 import type { SwipeDecision } from "../constants.js";
+import type { ReleaseHealthCheck } from "../types.js";
 import { allocatePort, applySwipeToPreferenceProfile, generateBranchName, newId, nowIso } from "../helpers.js";
 import { createAutopilotRepository } from "../repositories/autopilot.js";
 import {
@@ -10,7 +11,11 @@ import {
   shouldCreateDeliveryRun,
 } from "./delivery.js";
 import { evaluateDigestCreationPolicy } from "./digest-policy.js";
-import { createBudgetAlertDigest as buildBudgetAlertDigest, createStuckRunDigest as buildStuckRunDigest } from "./policy.js";
+import {
+  createBudgetAlertDigest as buildBudgetAlertDigest,
+  createHealthCheckFailedDigest as buildHealthCheckFailedDigest,
+  createStuckRunDigest as buildStuckRunDigest,
+} from "./policy.js";
 import {
   applySwipeToIdea,
   buildSwipeEvent,
@@ -78,6 +83,7 @@ export async function processSwipeDecision(ctx: PluginContext, input: {
       decision: input.decision,
       autopilotEnabled: autopilot.enabled,
       automationTier: autopilot.automationTier,
+      approvalMode: planningArtifact.approvalMode,
     })) {
       const runId = newId();
       const branchName = generateBranchName(input.projectId, input.ideaId);
@@ -138,6 +144,35 @@ export async function processSwipeDecision(ctx: PluginContext, input: {
     workspaceLease,
     productLock,
   };
+}
+
+export async function createHealthCheckFailedDigest(
+  ctx: PluginContext,
+  input: {
+    companyId: string;
+    projectId: string;
+    runId: string;
+    check: Pick<ReleaseHealthCheck, "checkId" | "checkType" | "name" | "errorMessage" | "companyId" | "projectId" | "runId" | "createdAt">;
+  },
+) {
+  const repo = createAutopilotRepository(ctx);
+  const run = await repo.getDeliveryRun(input.companyId, input.projectId, input.runId);
+  if (!run) return undefined;
+
+  const digest = buildHealthCheckFailedDigest({
+    digestId: newId(),
+    companyId: input.companyId,
+    projectId: input.projectId,
+    run,
+    check: input.check,
+    createdAt: nowIso(),
+  });
+  const existingDigests = await repo.listDigests(input.companyId, input.projectId);
+  const decision = evaluateDigestCreationPolicy(existingDigests, digest, digest.createdAt);
+  if (!decision.shouldCreate) return undefined;
+
+  await repo.upsertDigest(decision.candidate);
+  return decision.candidate;
 }
 
 export async function createBudgetAlertDigest(ctx: PluginContext, companyId: string, projectId: string) {

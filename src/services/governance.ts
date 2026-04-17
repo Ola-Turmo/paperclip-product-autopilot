@@ -1,7 +1,13 @@
 import type { AutomationTier, ExecutionMode } from "../constants.js";
 import type { Idea } from "../types.js";
 
-export type GovernanceAction = "auto_approve_plan" | "full_rollback" | "merge_lock";
+export type GovernanceAction =
+  | "auto_approve_plan"
+  | "full_rollback"
+  | "revert_commit_rollback"
+  | "merge_lock"
+  | "release_merge_lock"
+  | "force_cancel_run";
 
 export function requireGovernancePolicy(input: {
   action: GovernanceAction;
@@ -31,9 +37,33 @@ export function requireGovernancePolicy(input: {
         throw new Error("Full rollback requires a governance note");
       }
       return;
+    case "revert_commit_rollback":
+      if (!input.operatorAcknowledged) {
+        throw new Error("Revert-commit rollback requires explicit operator acknowledgment");
+      }
+      if (!input.governanceNote?.trim()) {
+        throw new Error("Revert-commit rollback requires a governance note");
+      }
+      return;
     case "merge_lock":
       if (!input.governanceNote?.trim()) {
         throw new Error("Merge locks require a governance note");
+      }
+      return;
+    case "release_merge_lock":
+      if (!input.operatorAcknowledged) {
+        throw new Error("Releasing a merge lock requires explicit operator acknowledgment");
+      }
+      if (!input.governanceNote?.trim()) {
+        throw new Error("Releasing a merge lock requires a governance note");
+      }
+      return;
+    case "force_cancel_run":
+      if (!input.operatorAcknowledged) {
+        throw new Error("Force-cancel requires explicit operator acknowledgment");
+      }
+      if (!input.governanceNote?.trim()) {
+        throw new Error("Force-cancel requires a governance note");
       }
       return;
     default: {

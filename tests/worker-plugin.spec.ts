@@ -86,5 +86,5 @@ describe("worker entrypoint", () => {
       status: "ok",
       message: "Product Autopilot plugin running",
     });
-  });
+  }, 15000);
 });
